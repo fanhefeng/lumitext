@@ -1,0 +1,54 @@
+name: Lumitext
+options:
+  createIntermediateGroups: true
+  deploymentTarget:
+    macOS: "26.0"
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    CODE_SIGN_STYLE: Manual
+    CODE_SIGN_IDENTITY: "-"
+    DEVELOPMENT_TEAM: ""
+    MACOSX_DEPLOYMENT_TARGET: "26.0"
+    CURRENT_PROJECT_VERSION: "1"
+    MARKETING_VERSION: "0.1.0"
+    ENABLE_HARDENED_RUNTIME: false
+targets:
+  Lumitext:
+    type: application
+    platform: macOS
+    sources:
+      - App
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.fanhefeng.lumitext
+        INFOPLIST_FILE: App/Info.plist
+        CODE_SIGN_ENTITLEMENTS: App/Lumitext.entitlements
+        PRODUCT_NAME: Lumitext
+    dependencies:
+      - target: LumitextSaver
+        embed: true
+  LumitextSaver:
+    type: app-extension
+    platform: macOS
+    sources:
+      - Saver
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.fanhefeng.lumitext.saver
+        INFOPLIST_FILE: Saver/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Saver/LumitextSaver.entitlements
+        PRODUCT_NAME: LumitextSaver
+        PRODUCT_MODULE_NAME: LumitextSaver
+        SWIFT_OBJC_BRIDGING_HEADER: Saver/Bridging-Header.h
+    dependencies:
+      - sdk: ScreenSaver.framework
+schemes:
+  Lumitext:
+    build:
+      targets:
+        Lumitext: all
+    run:
+      config: Debug
+    archive:
+      config: Release

@@ -1,0 +1,15 @@
+# XcodeGen — the .xcodeproj is generated from project.yml; never commit it
+*.xcodeproj/
+
+# Xcode
+DerivedData/
+build/
+xcuserdata/
+*.xcuserstate
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# macOS
+.DS_Store
