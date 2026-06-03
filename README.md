@@ -6,6 +6,8 @@ preview that matches exactly what you'll see.
 
 > **Status:** in active development (pre-release). Built and verified on macOS 26.5.
 
+![Lumitext configuration window](docs/images/config-window.png)
+
 ## Why
 
 macOS has no built-in way to show your own styled text as a screensaver. The native
