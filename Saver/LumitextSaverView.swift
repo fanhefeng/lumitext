@@ -25,8 +25,25 @@ final class LumitextSaverView: ScreenSaverView {
         wantsLayer = true
         report = Self.runProbes()
         for line in report {
-            logger.info("PROBE \(line, privacy: .public)")
+            logger.notice("PROBE \(line, privacy: .public)")
         }
+        // Persist the report to the App Group container too: os_log .info/.debug
+        // are not reliably written to the store, and this lets the host side
+        // read the verdict without depending on live log streaming.
+        Self.writeReportFile(report)
+    }
+
+    /// Write the probe report into the App Group container so it can be read
+    /// from a non-sandboxed process for verification.
+    static func writeReportFile(_ report: [String]) {
+        guard let container = FileManager.default
+            .containerURL(forSecurityApplicationGroupIdentifier: appGroupID) else { return }
+        let text = (["frame-isPreview-and-sandbox-probes"] + report).joined(separator: "\n")
+        try? text.write(
+            to: container.appendingPathComponent("m1-report.txt"),
+            atomically: true,
+            encoding: .utf8
+        )
     }
 
     required init?(coder: NSCoder) {
@@ -35,7 +52,7 @@ final class LumitextSaverView: ScreenSaverView {
     }
 
     deinit {
-        logger.info("deinit")
+        logger.notice("deinit")
     }
 
     // MARK: - Drawing

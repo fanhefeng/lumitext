@@ -23,7 +23,10 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: io.github.fanhefeng.lumitext
         INFOPLIST_FILE: App/Info.plist
-        CODE_SIGN_ENTITLEMENTS: App/Lumitext.entitlements
+        # NOTE: entitlements applied post-build by scripts/dev-sign.sh —
+        # CODE_SIGN_ENTITLEMENTS here makes Xcode demand a provisioning
+        # profile for the App Groups capability, which ad-hoc dev signing
+        # cannot satisfy. Release signing (M5) signs with entitlements too.
         PRODUCT_NAME: Lumitext
     dependencies:
       - target: LumitextSaver
@@ -37,7 +40,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: io.github.fanhefeng.lumitext.saver
         INFOPLIST_FILE: Saver/Info.plist
-        CODE_SIGN_ENTITLEMENTS: Saver/LumitextSaver.entitlements
+        # entitlements applied post-build — see note on the Lumitext target
         PRODUCT_NAME: LumitextSaver
         PRODUCT_MODULE_NAME: LumitextSaver
         SWIFT_OBJC_BRIDGING_HEADER: Saver/Bridging-Header.h

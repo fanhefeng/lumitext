@@ -30,16 +30,31 @@ pluginkit -a /Applications/Lumitext.app/Contents/PlugIns/LumitextSaver.appex
 pluginkit -m -v -p com.apple.screensaver | grep -i lumitext   # verify registration
 ```
 
-## Activate & trigger without GUI
+## Activate & trigger — SAFE policy (read this; learned the hard way)
 
+**NEVER `pkill`/`kill` ScreenSaverEngine or the saver process, and never SIGTERM a
+running `SACScreenSaverStartNow`.** Killing the engine mid-session corrupts
+loginwindow's `SACScreenSaverIsRunning` flag (stuck at 1 → "Screen Saver Already
+Running; Exiting" forever) AND wedges the App Group container's `containermanagerd`
+lease (directory reads hang). Both need a logout/reboot to clear. This is the Tahoe
+screensaver fragility the research warned about — don't poke it.
+
+Primary rendering verification = **the host app's embedded live preview**
+(`NSHostingView` of the same `LumitextCore` SwiftUI view). It runs in a normal process,
+needs no engine, and is byte-identical to what the saver draws. Use it for almost all
+dev iteration.
+
+Occasional real end-to-end check (saver reads host config in its true sandbox):
 ```bash
-# papersaver CLI (built from /tmp/lumitext-refs/PaperSaver): set active saver
-papersaver set "Lumitext"   # or PaperSaverKit.setScreensaverEverywhere from the host app
-# trigger the screensaver immediately:
-open -a ScreenSaverEngine
-# stop it:
-pkill ScreenSaverEngine
+papersaver set-saver "LumitextSaver"     # set active (PaperSaver CLI)
+# Then trigger via System Settings > Screen Saver preview, OR wait for real idle.
+# To recover the screen, move the real mouse / press a key — do NOT pkill.
+# When done testing, restore the user's saver:  papersaver set-saver "Hello"
 ```
+
+If the screensaver subsystem is already wedged (isRunning stuck / container readdir
+hangs): the only clean fix is **log out & back in, or reboot**. App Group file I/O by
+exact path still works while wedged; only directory enumeration hangs.
 
 ## Logs (primary verification channel)
 

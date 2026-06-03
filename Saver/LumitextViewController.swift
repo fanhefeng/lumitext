@@ -23,17 +23,17 @@ class LumitextViewController: ScreenSaverViewController {
     private var saverView: LumitextSaverView?
 
     override init(nibName nibNameOrNil: NSNib.Name?, bundle nibBundleOrNil: Bundle?) {
-        logger.info("init(nibName:bundle:)")
+        logger.notice("init(nibName:bundle:)")
         super.init(nibName: nibNameOrNil, bundle: nibBundleOrNil)
     }
 
     required init?(coder: NSCoder) {
-        logger.info("init(coder:)")
+        logger.notice("init(coder:)")
         super.init(coder: coder)
     }
 
     deinit {
-        logger.info("deinit")
+        logger.notice("deinit")
     }
 
     override func loadView() {
@@ -41,7 +41,7 @@ class LumitextViewController: ScreenSaverViewController {
         // Use the frame-width heuristic instead (System Settings previews are tiny).
         let frame = NSScreen.main?.frame ?? NSRect(x: 0, y: 0, width: 1920, height: 1080)
         let isPreview = frame.width < 400
-        logger.info("loadView() frame=\(frame.width, privacy: .public)x\(frame.height, privacy: .public) isPreview=\(isPreview)")
+        logger.notice("loadView() frame=\(frame.width, privacy: .public)x\(frame.height, privacy: .public) isPreview=\(isPreview)")
 
         let view = LumitextSaverView(frame: frame, isPreview: isPreview)
         saverView = view

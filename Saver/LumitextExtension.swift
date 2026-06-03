@@ -20,11 +20,11 @@ private let logger = Logger(subsystem: "io.github.fanhefeng.lumitext", category:
 class LumitextExtension: ScreenSaverExtension {
 
     @objc override init() {
-        logger.info("LumitextExtension.init() PID=\(ProcessInfo.processInfo.processIdentifier, privacy: .public)")
+        logger.notice("LumitextExtension.init() PID=\(ProcessInfo.processInfo.processIdentifier, privacy: .public)")
         super.init()
     }
 
     deinit {
-        logger.info("LumitextExtension.deinit")
+        logger.notice("LumitextExtension.deinit")
     }
 }
