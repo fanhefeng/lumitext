@@ -1,0 +1,135 @@
+//
+//  LumitextConfig.swift
+//  LumitextCore
+//
+//  The single source of truth that flows host app → App Group container → saver.
+//  Pure Foundation (no UI) so it is trivially testable and Codable. All decoding
+//  is forward/backward compatible: every field is optional-with-default and unknown
+//  JSON keys are ignored, so an older saver can read a newer host's config (and vice
+//  versa) without crashing — only `schemaVersion` gates any future hard migration.
+//
+
+import Foundation
+
+/// Codable RGBA color in the 0...1 range. Stored as plain numbers so the JSON is
+/// portable and human-inspectable; UI conversions live in LumitextRendering.swift.
+public struct RGBAColor: Codable, Equatable, Sendable {
+    public var red: Double
+    public var green: Double
+    public var blue: Double
+    public var alpha: Double
+
+    public init(red: Double, green: Double, blue: Double, alpha: Double = 1) {
+        self.red = red
+        self.green = green
+        self.blue = blue
+        self.alpha = alpha
+    }
+
+    public static let white = RGBAColor(red: 1, green: 1, blue: 1)
+    public static let black = RGBAColor(red: 0, green: 0, blue: 0)
+    /// Default backdrop: deep navy, matching the app's visual identity.
+    public static let defaultBackground = RGBAColor(red: 0.06, green: 0.08, blue: 0.16)
+}
+
+/// Horizontal placement of the text block within the screen.
+public enum HorizontalAlignment: String, Codable, CaseIterable, Sendable {
+    case leading, center, trailing
+}
+
+/// Vertical placement of the text block within the screen.
+public enum VerticalAlignment: String, Codable, CaseIterable, Sendable {
+    case top, center, bottom
+}
+
+/// Font weight, decoupled from AppKit/SwiftUI so the model stays UI-free.
+public enum FontWeight: String, Codable, CaseIterable, Sendable {
+    case thin, light, regular, medium, semibold, bold, heavy, black
+}
+
+public struct LumitextConfig: Codable, Equatable, Sendable {
+    /// Bump only for breaking changes that need migration code. v1 = initial.
+    public var schemaVersion: Int
+
+    public var text: String
+
+    /// Empty string means "system font". Otherwise an installed family name
+    /// (e.g. "Helvetica Neue"). The saver resolves it in its own sandbox; if the
+    /// family is unavailable there, rendering falls back to the system font.
+    public var fontFamily: String
+    public var fontWeight: FontWeight
+
+    /// Point size measured against a 1080-point-tall reference screen. The renderer
+    /// scales by (actualHeight / 1080) so the same config looks proportionally
+    /// identical on any display and in the small WYSIWYG preview. See LumitextLayout.
+    public var fontSize: Double
+
+    public var textColor: RGBAColor
+    public var backgroundColor: RGBAColor
+
+    public var horizontalAlignment: HorizontalAlignment
+    public var verticalAlignment: VerticalAlignment
+
+    /// Line spacing in reference points (added between wrapped/explicit lines).
+    public var lineSpacing: Double
+
+    public init(
+        schemaVersion: Int = LumitextConfig.currentSchemaVersion,
+        text: String = "Hello, Lumitext",
+        fontFamily: String = "",
+        fontWeight: FontWeight = .semibold,
+        fontSize: Double = 120,
+        textColor: RGBAColor = .white,
+        backgroundColor: RGBAColor = .defaultBackground,
+        horizontalAlignment: HorizontalAlignment = .center,
+        verticalAlignment: VerticalAlignment = .center,
+        lineSpacing: Double = 8
+    ) {
+        self.schemaVersion = schemaVersion
+        self.text = text
+        self.fontFamily = fontFamily
+        self.fontWeight = fontWeight
+        self.fontSize = fontSize
+        self.textColor = textColor
+        self.backgroundColor = backgroundColor
+        self.horizontalAlignment = horizontalAlignment
+        self.verticalAlignment = verticalAlignment
+        self.lineSpacing = lineSpacing
+    }
+
+    public static let currentSchemaVersion = 1
+
+    /// The configuration shown before the user has saved anything.
+    public static let `default` = LumitextConfig()
+
+    /// The reference screen height (points) that `fontSize`/`lineSpacing` are
+    /// expressed against. Rendering scales relative to this so output is
+    /// resolution-independent and the preview is a faithful miniature.
+    public static let referenceHeight: Double = 1080
+
+    // MARK: - Forward/backward-compatible decoding
+
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion, text, fontFamily, fontWeight, fontSize
+        case textColor, backgroundColor, horizontalAlignment, verticalAlignment, lineSpacing
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let d = LumitextConfig.default
+        // decodeIfPresent everywhere → missing keys fall back to defaults instead of throwing.
+        schemaVersion = try c.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? d.schemaVersion
+        text = try c.decodeIfPresent(String.self, forKey: .text) ?? d.text
+        fontFamily = try c.decodeIfPresent(String.self, forKey: .fontFamily) ?? d.fontFamily
+        fontSize = try c.decodeIfPresent(Double.self, forKey: .fontSize) ?? d.fontSize
+        textColor = try c.decodeIfPresent(RGBAColor.self, forKey: .textColor) ?? d.textColor
+        backgroundColor = try c.decodeIfPresent(RGBAColor.self, forKey: .backgroundColor) ?? d.backgroundColor
+        lineSpacing = try c.decodeIfPresent(Double.self, forKey: .lineSpacing) ?? d.lineSpacing
+        // Enums: decode the raw string and map tolerantly. A raw enum decode would
+        // THROW on an unknown future value; decoding the string and using
+        // init(rawValue:) lets an unrecognized value fall back to the default.
+        fontWeight = FontWeight(rawValue: try c.decodeIfPresent(String.self, forKey: .fontWeight) ?? "") ?? d.fontWeight
+        horizontalAlignment = HorizontalAlignment(rawValue: try c.decodeIfPresent(String.self, forKey: .horizontalAlignment) ?? "") ?? d.horizontalAlignment
+        verticalAlignment = VerticalAlignment(rawValue: try c.decodeIfPresent(String.self, forKey: .verticalAlignment) ?? "") ?? d.verticalAlignment
+    }
+}

@@ -2,123 +2,63 @@
 //  LumitextSaverView.swift
 //  LumitextSaver
 //
-//  M1 spike view: renders the results of the sandbox file-access probes
-//  full-screen, so the config-channel decision (App Group vs /Users/Shared)
-//  is verifiable both visually and via os.log.
+//  The screensaver view. Hosts the shared SwiftUI renderer (LumitextCore.
+//  LumitextTextView) via NSHostingView so the saver and the host app's live
+//  preview draw identically. Reads the config once from the App Group container
+//  at construction; the host app is the sole writer.
 //
-//  This file will be replaced by the real text renderer (LumitextCore) in M3.
+//  Per-screen instances are independent and hold no mutable shared state, so the
+//  Tahoe multi-monitor pitfalls (which afflicted the leaky legacy host) don't apply
+//  here — each appex instance runs in its own XPC process.
 //
 
 import ScreenSaver
+import SwiftUI
+import LumitextCore
 import os.log
 
 private let logger = Logger(subsystem: "io.github.fanhefeng.lumitext", category: "Saver")
 
 final class LumitextSaverView: ScreenSaverView {
 
-    static let appGroupID = "group.io.github.fanhefeng.lumitext"
-
-    private var report: [String] = []
+    private var hosting: NSHostingView<LumitextTextView>?
 
     override init?(frame: NSRect, isPreview: Bool) {
         super.init(frame: frame, isPreview: isPreview)
         wantsLayer = true
-        report = Self.runProbes()
-        for line in report {
-            logger.notice("PROBE \(line, privacy: .public)")
-        }
-        // Persist the report to the App Group container too: os_log .info/.debug
-        // are not reliably written to the store, and this lets the host side
-        // read the verdict without depending on live log streaming.
-        Self.writeReportFile(report)
-    }
-
-    /// Write the probe report into the App Group container so it can be read
-    /// from a non-sandboxed process for verification.
-    static func writeReportFile(_ report: [String]) {
-        guard let container = FileManager.default
-            .containerURL(forSecurityApplicationGroupIdentifier: appGroupID) else { return }
-        let text = (["frame-isPreview-and-sandbox-probes"] + report).joined(separator: "\n")
-        try? text.write(
-            to: container.appendingPathComponent("m1-report.txt"),
-            atomically: true,
-            encoding: .utf8
-        )
+        setupHosting()
     }
 
     required init?(coder: NSCoder) {
         super.init(coder: coder)
         wantsLayer = true
+        setupHosting()
     }
 
     deinit {
         logger.notice("deinit")
     }
 
-    // MARK: - Drawing
-
-    override func draw(_ rect: NSRect) {
-        NSColor(calibratedRed: 0.06, green: 0.08, blue: 0.16, alpha: 1).setFill()
-        bounds.fill()
-
-        let text = (["Lumitext M1 Spike — sandbox probes"] + report).joined(separator: "\n\n")
-        let attrs: [NSAttributedString.Key: Any] = [
-            .font: NSFont.monospacedSystemFont(ofSize: isPreview ? 5 : 20, weight: .medium),
-            .foregroundColor: NSColor.white,
-        ]
-        (text as NSString).draw(
-            in: bounds.insetBy(dx: bounds.width * 0.06, dy: bounds.height * 0.08),
-            withAttributes: attrs
-        )
+    private func setupHosting() {
+        let config = Self.loadConfig()
+        let host = NSHostingView(rootView: LumitextTextView(config: config))
+        host.frame = bounds
+        host.autoresizingMask = [.width, .height]
+        addSubview(host)
+        hosting = host
+        logger.notice("setupHosting text.len=\(config.text.count, privacy: .public) family=\(config.fontFamily, privacy: .public) size=\(config.fontSize, privacy: .public)")
     }
 
-    // MARK: - Probes (M1 experiment)
-
-    /// Each probe answers one architecture question:
-    ///  1. Does the sandboxed appex resolve an App Group container?
-    ///  2. Can it READ a file the (non-sandboxed) host wrote there?
-    ///  3. Can it WRITE there (needed for future saver-side state)?
-    ///  4. Is /Users/Shared readable (research says: NO without a
-    ///     temporary-exception entitlement — captured here as evidence)?
-    static func runProbes() -> [String] {
-        var out: [String] = []
-        out.append("home=\(NSHomeDirectory())")
-
-        let fm = FileManager.default
-        if let container = fm.containerURL(forSecurityApplicationGroupIdentifier: appGroupID) {
-            out.append("group.container=\(container.path)")
-
-            let probe = container.appendingPathComponent("probe.txt")
-            do {
-                let s = try String(contentsOf: probe, encoding: .utf8)
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-                out.append("group.read=OK \"\(s)\"")
-            } catch {
-                out.append("group.read=FAIL \(error.localizedDescription)")
-            }
-
-            do {
-                try "saver-write \(Date())".write(
-                    to: container.appendingPathComponent("saver-write.txt"),
-                    atomically: true,
-                    encoding: .utf8
-                )
-                out.append("group.write=OK")
-            } catch {
-                out.append("group.write=FAIL \(error.localizedDescription)")
-            }
-        } else {
-            out.append("group.container=NIL")
+    /// Load the user's config from the App Group container; fall back to defaults
+    /// if the container or file is unavailable (the saver must always render).
+    private static func loadConfig() -> LumitextConfig {
+        guard let store = try? ConfigStore.appGroup() else {
+            logger.error("App Group container unavailable; using default config")
+            return .default
         }
-
-        do {
-            let s = try String(contentsOf: URL(fileURLWithPath: "/Users/Shared/Lumitext/probe.txt"), encoding: .utf8)
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            out.append("shared.read=OK \"\(s)\"")
-        } catch {
-            out.append("shared.read=FAIL \(error.localizedDescription)")
-        }
-
-        return out
+        return store.load()
     }
+
+    // ScreenSaverView animation hooks are unused: SwiftUI self-drives any animation
+    // and SSENeedsAnimationTimer=false, so we don't override animateOneFrame().
 }
