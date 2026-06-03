@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Sparkle appcast for Lumitext. Published to GitHub Releases (or GitHub Pages) and
+  pointed at by the host app's SUFeedURL. Each release appends an <item>. Generate
+  the entry (incl. the EdDSA `sparkle:edSignature`) with Sparkle's `generate_appcast`
+  tool against the signed DMG — see RELEASE.md. This file is a template / starting
+  point with no published versions yet.
+-->
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>Lumitext</title>
+    <link>https://github.com/fanhefeng/lumitext/releases</link>
+    <description>Updates for Lumitext, the custom-text screensaver for macOS Tahoe.</description>
+    <language>en</language>
+    <!--
+    <item>
+      <title>Version 0.1.0</title>
+      <sparkle:version>1</sparkle:version>
+      <sparkle:shortVersionString>0.1.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <pubDate>Tue, 01 Jan 2030 00:00:00 +0000</pubDate>
+      <enclosure
+        url="https://github.com/fanhefeng/lumitext/releases/download/v0.1.0/Lumitext-0.1.0.dmg"
+        sparkle:edSignature="REPLACE_WITH_ED_SIGNATURE"
+        length="REPLACE_WITH_BYTE_LENGTH"
+        type="application/octet-stream" />
+    </item>
+    -->
+  </channel>
+</rss>
