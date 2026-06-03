@@ -1,6 +1,11 @@
 name: Lumitext
 options:
   createIntermediateGroups: true
+  developmentLanguage: en
+  knownRegions:
+    - en
+    - Base
+    - zh-Hans
   deploymentTarget:
     macOS: "26.0"
 settings:

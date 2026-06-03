@@ -12,7 +12,7 @@ import LumitextCore
 struct ActivationBar: View {
     @ObservedObject var activation: ActivationManager
 
-    private let idleChoices: [(String, Int)] = [
+    private let idleChoices: [(LocalizedStringKey, Int)] = [
         ("1 min", 60), ("2 min", 120), ("5 min", 300),
         ("10 min", 600), ("20 min", 1200), ("Never", 0),
     ]
@@ -68,13 +68,13 @@ struct ActivationBar: View {
             }
 
             DisclosureGroup("About “lock screen”") {
-                Text("""
+                Text(String(localized: "lockScreenExplanation", defaultValue: """
                 Lumitext shows your text while the Mac is idle, in the same window every \
                 screensaver uses. Once macOS fully locks the screen, the system login \
                 window takes over and no third-party app can draw there — that's an OS \
                 security boundary. For the longest visible time, set “require password” \
                 to begin a little after the screensaver starts.
-                """)
+                """))
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

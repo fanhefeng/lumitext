@@ -1,0 +1,43 @@
+/* Lumitext — Simplified Chinese (zh-Hans) */
+
+/* ConfigPanel sections & labels */
+"Text" = "文字";
+"Font" = "字体";
+"Family" = "字体族";
+"Weight" = "字重";
+"Size" = "字号";
+"Colors" = "颜色";
+"Background" = "背景";
+"Position" = "位置";
+"Horizontal" = "水平";
+"Vertical" = "垂直";
+"Left" = "左";
+"Center" = "居中";
+"Right" = "右";
+"Top" = "上";
+"Middle" = "中";
+"Bottom" = "下";
+
+/* Preview */
+"Preview" = "预览";
+
+/* Activation */
+"Move Lumitext to Applications" = "将 Lumitext 移到“应用程序”";
+"macOS only reliably finds the screensaver when the app runs from /Applications." = "只有当 App 位于 /Applications 时，macOS 才能稳定地找到屏保。";
+"Move…" = "移动…";
+"Set as Screen Saver" = "设为屏保";
+"Active" = "已启用";
+"Not active" = "未启用";
+"Start after" = "空闲后启动";
+"About “lock screen”" = "关于“锁屏”";
+
+/* Idle-time choices */
+"1 min" = "1 分钟";
+"2 min" = "2 分钟";
+"5 min" = "5 分钟";
+"10 min" = "10 分钟";
+"20 min" = "20 分钟";
+"Never" = "永不";
+
+/* Lock-screen explanation (long) */
+"lockScreenExplanation" = "Lumitext 会在 Mac 空闲时显示你的文字，使用与所有屏保相同的窗口层。一旦 macOS 完全锁屏，系统登录窗口会接管屏幕，任何第三方 App 都无法在其上绘制——这是操作系统的安全边界。为了让文字显示更久，可将“要求输入密码”设置为在屏保启动后稍晚一点再生效。";
