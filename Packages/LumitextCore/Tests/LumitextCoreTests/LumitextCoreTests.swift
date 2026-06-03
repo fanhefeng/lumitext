@@ -70,6 +70,42 @@ final class LumitextConfigTests: XCTestCase {
     func testEmptyDataIsNotDecodable() {
         XCTAssertThrowsError(try decode(Data()))
     }
+
+    // MARK: - Numeric / color clamping (corrupt or hand-edited JSON must stay safe)
+
+    func testZeroAndNegativeFontSizeClamped() throws {
+        for raw in [0.0, -50.0] {
+            let json = #"{"text":"x","fontSize":\#(raw)}"#.data(using: .utf8)!
+            let c = try decode(json)
+            XCTAssertGreaterThanOrEqual(c.fontSize, LumitextConfig.fontSizeRange.lowerBound)
+        }
+    }
+
+    func testAbsurdFontSizeClamped() throws {
+        let json = #"{"text":"x","fontSize":999999}"#.data(using: .utf8)!
+        XCTAssertLessThanOrEqual(try decode(json).fontSize, LumitextConfig.fontSizeRange.upperBound)
+    }
+
+    func testNegativeLineSpacingClampedToZero() throws {
+        let json = #"{"text":"x","lineSpacing":-10}"#.data(using: .utf8)!
+        XCTAssertEqual(try decode(json).lineSpacing, 0)
+    }
+
+    func testOutOfRangeColorsClamped() throws {
+        let json = #"{"text":"x","textColor":{"red":5,"green":-2,"blue":0.5,"alpha":9}}"#.data(using: .utf8)!
+        let c = try decode(json).textColor
+        XCTAssertEqual(c.red, 1)
+        XCTAssertEqual(c.green, 0)
+        XCTAssertEqual(c.blue, 0.5, accuracy: 0.0001)
+        XCTAssertEqual(c.alpha, 1)
+    }
+
+    func testColorInitClampsDirectly() {
+        let c = RGBAColor(red: 2, green: -1, blue: 0.3, alpha: 0.5)
+        XCTAssertEqual(c.red, 1)
+        XCTAssertEqual(c.green, 0)
+        XCTAssertEqual(c.blue, 0.3, accuracy: 0.0001)
+    }
 }
 
 final class ConfigStoreTests: XCTestCase {

@@ -44,6 +44,9 @@ class LumitextViewController: ScreenSaverViewController {
         logger.notice("loadView() frame=\(frame.width, privacy: .public)x\(frame.height, privacy: .public) isPreview=\(isPreview)")
 
         let view = LumitextSaverView(frame: frame, isPreview: isPreview)
+        if view == nil {
+            logger.error("LumitextSaverView init returned nil; falling back to blank NSView")
+        }
         saverView = view
         self.view = view ?? NSView(frame: frame)
     }

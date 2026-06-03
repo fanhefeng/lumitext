@@ -20,16 +20,32 @@ public struct RGBAColor: Codable, Equatable, Sendable {
     public var alpha: Double
 
     public init(red: Double, green: Double, blue: Double, alpha: Double = 1) {
-        self.red = red
-        self.green = green
-        self.blue = blue
-        self.alpha = alpha
+        // Clamp to a valid color range so a hand-edited/corrupt JSON can't produce
+        // out-of-gamut values that misrender. NaN collapses to 0.
+        func clamp(_ v: Double) -> Double { v.isFinite ? min(max(v, 0), 1) : 0 }
+        self.red = clamp(red)
+        self.green = clamp(green)
+        self.blue = clamp(blue)
+        self.alpha = clamp(alpha)
     }
 
     public static let white = RGBAColor(red: 1, green: 1, blue: 1)
     public static let black = RGBAColor(red: 0, green: 0, blue: 0)
     /// Default backdrop: deep navy, matching the app's visual identity.
     public static let defaultBackground = RGBAColor(red: 0.06, green: 0.08, blue: 0.16)
+
+    private enum CodingKeys: String, CodingKey { case red, green, blue, alpha }
+
+    // Route decoding through the clamping init so persisted/edited values stay valid.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            red: try c.decodeIfPresent(Double.self, forKey: .red) ?? 0,
+            green: try c.decodeIfPresent(Double.self, forKey: .green) ?? 0,
+            blue: try c.decodeIfPresent(Double.self, forKey: .blue) ?? 0,
+            alpha: try c.decodeIfPresent(Double.self, forKey: .alpha) ?? 1
+        )
+    }
 }
 
 /// Horizontal placement of the text block within the screen.
@@ -89,12 +105,21 @@ public struct LumitextConfig: Codable, Equatable, Sendable {
         self.text = text
         self.fontFamily = fontFamily
         self.fontWeight = fontWeight
-        self.fontSize = fontSize
+        self.fontSize = LumitextConfig.clampFontSize(fontSize)
         self.textColor = textColor
         self.backgroundColor = backgroundColor
         self.horizontalAlignment = horizontalAlignment
         self.verticalAlignment = verticalAlignment
-        self.lineSpacing = lineSpacing
+        self.lineSpacing = LumitextConfig.clampLineSpacing(lineSpacing)
+    }
+
+    /// Keep the renderer safe from corrupt/hand-edited values (0, negative, NaN, absurd).
+    public static let fontSizeRange: ClosedRange<Double> = 1...2000
+    static func clampFontSize(_ v: Double) -> Double {
+        v.isFinite ? min(max(v, fontSizeRange.lowerBound), fontSizeRange.upperBound) : 120
+    }
+    static func clampLineSpacing(_ v: Double) -> Double {
+        v.isFinite ? min(max(v, 0), 1000) : 0
     }
 
     public static let currentSchemaVersion = 1
@@ -121,10 +146,10 @@ public struct LumitextConfig: Codable, Equatable, Sendable {
         schemaVersion = try c.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? d.schemaVersion
         text = try c.decodeIfPresent(String.self, forKey: .text) ?? d.text
         fontFamily = try c.decodeIfPresent(String.self, forKey: .fontFamily) ?? d.fontFamily
-        fontSize = try c.decodeIfPresent(Double.self, forKey: .fontSize) ?? d.fontSize
+        fontSize = LumitextConfig.clampFontSize(try c.decodeIfPresent(Double.self, forKey: .fontSize) ?? d.fontSize)
         textColor = try c.decodeIfPresent(RGBAColor.self, forKey: .textColor) ?? d.textColor
         backgroundColor = try c.decodeIfPresent(RGBAColor.self, forKey: .backgroundColor) ?? d.backgroundColor
-        lineSpacing = try c.decodeIfPresent(Double.self, forKey: .lineSpacing) ?? d.lineSpacing
+        lineSpacing = LumitextConfig.clampLineSpacing(try c.decodeIfPresent(Double.self, forKey: .lineSpacing) ?? d.lineSpacing)
         // Enums: decode the raw string and map tolerantly. A raw enum decode would
         // THROW on an unknown future value; decoding the string and using
         // init(rawValue:) lets an unrecognized value fall back to the default.

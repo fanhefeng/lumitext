@@ -27,7 +27,12 @@ public final class ConfigStore: @unchecked Sendable {
     public static let fileName = "config.json"
 
     private let fileURL: URL
-    private let ioQueue = DispatchQueue(label: "io.github.fanhefeng.lumitext.ConfigStore")
+    /// One process-wide serial queue shared by all ConfigStore instances, so two
+    /// instances pointing at the same file can't interleave writes. (Cross-process
+    /// safety still comes from the atomic write below — the saver and host are
+    /// separate processes — but this removes the in-process footgun.)
+    private static let ioQueue = DispatchQueue(label: "io.github.fanhefeng.lumitext.ConfigStore")
+    private var ioQueue: DispatchQueue { ConfigStore.ioQueue }
 
     /// Create a store rooted at an explicit directory (used by tests with a temp dir,
     /// and by callers that already resolved the container URL).

@@ -16,6 +16,9 @@ settings:
 packages:
   LumitextCore:
     path: Packages/LumitextCore
+  PaperSaver:
+    url: https://github.com/AerialScreensaver/PaperSaver
+    revision: 23e4bb4362e10b6ab0d6a3cc5369eed76bc7d169
 targets:
   Lumitext:
     type: application
@@ -35,6 +38,8 @@ targets:
       - target: LumitextSaver
         embed: true
       - package: LumitextCore
+      - package: PaperSaver
+        product: PaperSaverKit
   LumitextSaver:
     type: app-extension
     platform: macOS
