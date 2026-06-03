@@ -34,30 +34,21 @@ final class AppModel: ObservableObject {
         } else {
             store = nil
         }
-        config = .default
-
         if persist && store == nil {
             persistenceWarning = "App Group container unavailable — changes won't be saved to the screensaver."
         }
 
-        loadInitial()
+        // Load BEFORE subscribing the autosave, so the initial persisted config can't
+        // be clobbered by a save triggered from an async load completing after a user
+        // edit. The load is bounded (never hangs launch on a slow/wedged container).
+        config = store?.load(timeout: 0.5) ?? .default
+
         // Debounced autosave: coalesce rapid edits (typing, slider drags) into one write.
         $config
             .dropFirst()
             .debounce(for: .milliseconds(400), scheduler: RunLoop.main)
             .sink { [weak self] cfg in self?.save(cfg) }
             .store(in: &cancellables)
-    }
-
-    /// Load the persisted config without blocking the UI. A wedged/slow container
-    /// can make ConfigStore.load() slow, so it runs off-main and only the result
-    /// hops back to the main actor.
-    private func loadInitial() {
-        guard let store else { return }
-        Task.detached(priority: .userInitiated) {
-            let loaded = store.load()
-            await MainActor.run { self.config = loaded }
-        }
     }
 
     private func save(_ cfg: LumitextConfig) {

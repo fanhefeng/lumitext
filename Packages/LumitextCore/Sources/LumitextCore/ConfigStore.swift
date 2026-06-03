@@ -14,6 +14,9 @@
 
 import Foundation
 
+// SAFETY (@unchecked Sendable): the only stored property, `fileURL`, is immutable
+// after init; all file I/O is funneled through the shared static serial `ioQueue`;
+// and writes are atomic (rename), so cross-process readers never see a torn file.
 public final class ConfigStore: @unchecked Sendable {
 
     public enum StoreError: Error {
@@ -65,6 +68,25 @@ public final class ConfigStore: @unchecked Sendable {
             guard let data = try? Data(contentsOf: fileURL) else { return .default }
             return (try? JSONDecoder().decode(LumitextConfig.self, from: data)) ?? .default
         }
+    }
+
+    /// Bounded load: run `load()` off-thread and give up after `timeout`, returning
+    /// `.default`. Used where a hang is unacceptable — the saver must never freeze
+    /// the screen if the App Group container is momentarily slow/wedged.
+    public func load(timeout: TimeInterval) -> LumitextConfig {
+        let box = ResultBox()
+        let done = DispatchSemaphore(value: 0)
+        DispatchQueue.global(qos: .userInitiated).async {
+            box.value = self.load()
+            done.signal()
+        }
+        // On success the semaphore establishes happens-before, so reading box.value
+        // is safe; on timeout we never read it.
+        return done.wait(timeout: .now() + timeout) == .success ? box.value : .default
+    }
+
+    private final class ResultBox: @unchecked Sendable {
+        var value = LumitextConfig.default
     }
 
     // MARK: - Write

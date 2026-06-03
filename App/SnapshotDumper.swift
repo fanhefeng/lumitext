@@ -48,7 +48,11 @@ final class SnapshotAppDelegate: NSObject, NSApplicationDelegate {
             FileHandle.standardError.write("SNAPSHOT png encode failed\n".data(using: .utf8)!)
             return
         }
-        try? png.write(to: URL(fileURLWithPath: path))
-        FileHandle.standardError.write("SNAPSHOT wrote \(path)\n".data(using: .utf8)!)
+        do {
+            try png.write(to: URL(fileURLWithPath: path))
+            FileHandle.standardError.write("SNAPSHOT wrote \(path)\n".data(using: .utf8)!)
+        } catch {
+            FileHandle.standardError.write("SNAPSHOT write failed: \(error.localizedDescription)\n".data(using: .utf8)!)
+        }
     }
 }

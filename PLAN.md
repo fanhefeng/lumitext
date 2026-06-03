@@ -9,6 +9,19 @@
 > M1–M4 用本地签名完成完整自用版；M5/M6 的公证、DMG 公开分发、Homebrew cask 延后到注册之时
 > （架构与脚本照常备好，到时只换签名身份）。
 
+## 进度（2026-06-04，单次自治执行）
+
+| 里程碑 | 状态 |
+|---|---|
+| M1 私有 API + App Group 尖兵 | ✅ 真机验证（ADR-0001） |
+| M2 LumitextCore 共享包 + 渲染器 | ✅ 17 单测通过 + ImageRenderer 快照验证 |
+| M3 屏保读 App Group 配置渲染 | ✅ 代码完成（并入 M2/M4）；**真机上屏验证延后到重启后**（见 docs/POST-REBOOT-CHECKLIST.md） |
+| M4 宿主配置 GUI + 实时预览 + 激活 | ✅ 窗口截图验证（docs/images/） |
+| M5 发布工具链 | ✅ sign/make-dmg 实测可用；公证/Sparkle 待 Developer ID（RELEASE.md） |
+| M6 加固/评审/本地化 | ✅ 两轮多 agent 对抗评审 + zh-Hans 本地化 |
+
+仓库：https://github.com/fanhefeng/lumitext （公开）。两处遗留均为重启即清除的开发态副作用，非产品缺陷。
+
 ## 一、最终架构（评审一致胜出）
 
 **一个 Developer-ID 签名 + 公证的宿主 App（Lumitext.app），内嵌一个现代 ExtensionKit 屏保扩展（LumitextSaver.appex）。不用 legacy `.saver`。**

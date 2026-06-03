@@ -44,13 +44,15 @@ final class ActivationManager: ObservableObject {
     }
 
     /// Register the embedded appex with pluginkit so it appears in System Settings.
-    func registerExtension() {
+    /// Runs the pluginkit process off the main thread so launch never beachballs.
+    func registerExtension() async {
         guard let path = embeddedExtensionPath,
               FileManager.default.fileExists(atPath: path) else {
             lastError = "Embedded screensaver not found in app bundle."
             return
         }
-        runPluginkit(["-a", path])
+        let status = await Self.runProcessOffMain("/usr/bin/pluginkit", ["-a", path])
+        logger.notice("pluginkit -a exit=\(status)")
     }
 
     /// Set Lumitext as the active screensaver on every display.
@@ -93,16 +95,22 @@ final class ActivationManager: ObservableObject {
         }
     }
 
-    private func runPluginkit(_ args: [String]) {
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/bin/pluginkit")
-        task.arguments = args
-        do {
-            try task.run()
-            task.waitUntilExit()
-            logger.notice("pluginkit \(args.joined(separator: " "), privacy: .public) exit=\(task.terminationStatus)")
-        } catch {
-            lastError = error.localizedDescription
+    /// Run a process on a background queue and await its exit status, so the main
+    /// (UI) thread is never blocked on waitUntilExit().
+    private static func runProcessOffMain(_ path: String, _ args: [String]) async -> Int32 {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                let task = Process()
+                task.executableURL = URL(fileURLWithPath: path)
+                task.arguments = args
+                do {
+                    try task.run()
+                    task.waitUntilExit()
+                    continuation.resume(returning: task.terminationStatus)
+                } catch {
+                    continuation.resume(returning: -1)
+                }
+            }
         }
     }
 }

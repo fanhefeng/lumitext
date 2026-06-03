@@ -37,8 +37,10 @@ struct ActivationBar: View {
 
             HStack(spacing: 12) {
                 Button {
-                    activation.registerExtension()
-                    Task { await activation.setAsScreensaverEverywhere() }
+                    Task {
+                        await activation.registerExtension()
+                        await activation.setAsScreensaverEverywhere()
+                    }
                 } label: {
                     Label("Set as Screen Saver", systemImage: "sparkles.tv")
                 }

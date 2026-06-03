@@ -144,6 +144,20 @@ final class ConfigStoreTests: XCTestCase {
         XCTAssertEqual(store.load(), .default)
     }
 
+    func testLoadWithTimeoutReturnsSavedConfig() throws {
+        let dir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let store = ConfigStore(directory: dir)
+        try store.save(LumitextConfig(text: "bounded"))
+        XCTAssertEqual(store.load(timeout: 2.0).text, "bounded")
+    }
+
+    func testLoadWithTimeoutMissingFileReturnsDefault() throws {
+        let dir = try makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        XCTAssertEqual(ConfigStore(directory: dir).load(timeout: 2.0), .default)
+    }
+
     func testOverwritePreservesLatest() throws {
         let dir = try makeTempDir()
         defer { try? FileManager.default.removeItem(at: dir) }

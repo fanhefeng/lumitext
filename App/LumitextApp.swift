@@ -22,7 +22,7 @@ struct LumitextApp: App {
                     activation.refresh()
                     // Auto-register the embedded saver so it shows up in System Settings.
                     if activation.isInApplicationsFolder {
-                        activation.registerExtension()
+                        await activation.registerExtension()
                     }
                 }
         }

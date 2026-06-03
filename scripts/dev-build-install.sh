@@ -23,8 +23,11 @@ xcodebuild -project Lumitext.xcodeproj -scheme Lumitext -configuration Debug \
     build SYMROOT="$PWD/build" -quiet
 
 echo "== sign (inside-out, ad-hoc + entitlements) =="
+# Dev uses the .debug entitlements (adds disable-library-validation) because
+# ad-hoc signing has no Team ID for library validation. Release (scripts/sign.sh)
+# uses the hardened Saver/LumitextSaver.entitlements instead.
 codesign --force --sign - \
-    --entitlements Saver/LumitextSaver.entitlements \
+    --entitlements Saver/LumitextSaver.debug.entitlements \
     "$APPEX"
 codesign --force --sign - \
     --entitlements App/Lumitext.entitlements \

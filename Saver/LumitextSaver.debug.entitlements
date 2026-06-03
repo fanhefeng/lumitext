@@ -1,8 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  DEV-ONLY entitlements for the ad-hoc-signed Debug build. Adds
+  disable-library-validation because ad-hoc signatures carry no Team ID, so
+  library validation would otherwise reject loading the Debug .debug.dylib.
+  The shipping (Developer-ID, notarized) build uses LumitextSaver.entitlements,
+  which omits it — matching Apple's own appex savers (Hello/Drift/Arabesque),
+  which do NOT carry disable-library-validation.
+-->
 <plist version="1.0">
 <dict>
 	<key>com.apple.security.app-sandbox</key>
+	<true/>
+	<key>com.apple.security.cs.disable-library-validation</key>
 	<true/>
 	<key>com.apple.security.application-groups</key>
 	<array>
