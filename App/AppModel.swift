@@ -40,8 +40,8 @@ final class AppModel: ObservableObject {
 
         // Load BEFORE subscribing the autosave, so the initial persisted config can't
         // be clobbered by a save triggered from an async load completing after a user
-        // edit. The load is bounded (never hangs launch on a slow/wedged container).
-        config = store?.load(timeout: 0.5) ?? .default
+        // edit. The host is non-sandboxed so its container read is fast.
+        config = store?.load() ?? .default
 
         // Debounced autosave: coalesce rapid edits (typing, slider drags) into one write.
         $config

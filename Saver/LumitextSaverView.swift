@@ -44,25 +44,34 @@ final class LumitextSaverView: ScreenSaverView {
     }
 
     private func setupHosting() {
-        let config = Self.loadConfig()
-        let host = NSHostingView(rootView: LumitextTextView(config: config))
+        // Render defaults INSTANTLY (no blocking), then load the real config off the
+        // main thread and swap it in. This never hangs the screen — even if the
+        // sandboxed appex's first App Group container vend is slow on a cold start
+        // (an aggressive synchronous timeout would wrongly fall back to default) —
+        // and is always eventually correct.
+        let host = NSHostingView(rootView: LumitextTextView(config: .default))
         host.frame = bounds
         host.autoresizingMask = [.width, .height]
         addSubview(host)
         hosting = host
-        // Log only non-sensitive style metadata — never the user's text content.
-        logger.notice("setupHosting family=\(config.fontFamily, privacy: .public) size=\(config.fontSize, privacy: .public)")
+        loadConfigAndApply()
     }
 
-    /// Load the user's config from the App Group container; fall back to defaults
-    /// if the container or file is unavailable. Uses a bounded load so a slow/wedged
-    /// container can never freeze the screensaver — it renders defaults instead.
-    private static func loadConfig() -> LumitextConfig {
-        guard let store = try? ConfigStore.appGroup() else {
-            logger.error("App Group container unavailable; using default config")
-            return .default
+    /// Load the user's config from the App Group container off-thread, then apply it
+    /// on the main thread. Logs the resolved path + applied size so the read path is
+    /// verifiable from the unified log without exposing the user's text content.
+    private func loadConfigAndApply() {
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let store = try? ConfigStore.appGroup() else {
+                logger.error("App Group container unavailable; keeping default config")
+                return
+            }
+            let config = store.load()
+            DispatchQueue.main.async {
+                self?.hosting?.rootView = LumitextTextView(config: config)
+                logger.notice("applied config path=\(store.path, privacy: .public) family=\(config.fontFamily, privacy: .public) size=\(config.fontSize, privacy: .public)")
+            }
         }
-        return store.load(timeout: 0.5)
     }
 
     // ScreenSaverView animation hooks are unused: SwiftUI self-drives any animation

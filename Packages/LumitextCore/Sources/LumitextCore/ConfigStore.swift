@@ -70,25 +70,6 @@ public final class ConfigStore: @unchecked Sendable {
         }
     }
 
-    /// Bounded load: run `load()` off-thread and give up after `timeout`, returning
-    /// `.default`. Used where a hang is unacceptable — the saver must never freeze
-    /// the screen if the App Group container is momentarily slow/wedged.
-    public func load(timeout: TimeInterval) -> LumitextConfig {
-        let box = ResultBox()
-        let done = DispatchSemaphore(value: 0)
-        DispatchQueue.global(qos: .userInitiated).async {
-            box.value = self.load()
-            done.signal()
-        }
-        // On success the semaphore establishes happens-before, so reading box.value
-        // is safe; on timeout we never read it.
-        return done.wait(timeout: .now() + timeout) == .success ? box.value : .default
-    }
-
-    private final class ResultBox: @unchecked Sendable {
-        var value = LumitextConfig.default
-    }
-
     // MARK: - Write
 
     /// Encode and write the config atomically. Serialized on a private queue so
