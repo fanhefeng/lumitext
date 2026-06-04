@@ -50,6 +50,12 @@ visible for as long as possible before the secure lock takes over.
 Pre-built signed releases (DMG + Homebrew cask) will be published once the project
 reaches its first tagged release. For now, build from source (below).
 
+Sharing an unsigned preview build with someone: `./scripts/make-share-zip.sh
+build/Release/Lumitext.app` produces a zip containing the app plus step-by-step
+install/unblock instructions (`distribution/安装说明.txt`). Recipients need macOS 26+;
+hand-offs via USB/scp open with no prompts, downloads need one Gatekeeper approval
+(both paths are covered in the bundled instructions).
+
 ## Build from source
 
 Requires Xcode 26 and [XcodeGen](https://github.com/yonaskolb/XcodeGen)

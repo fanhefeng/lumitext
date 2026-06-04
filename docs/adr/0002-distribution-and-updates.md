@@ -13,9 +13,13 @@ codebase that (a) uses the private ScreenSaver appex API and (b) installs an App
 - **Channel:** Developer-ID-signed, notarized, double-stapled **DMG** as the primary
   artifact, served from **GitHub Releases**; a **Homebrew cask** (`auto_updates true`)
   as the secondary. No Mac App Store.
-- **Why DMG over zip:** dragging from a mounted DMG to /Applications avoids the
-  quarantine xattr that triggers Tahoe's buried, time-boxed "Open Anyway" flow. A zip
-  inherits quarantine on every file.
+- **Why DMG over zip:** once notarized + stapled, the DMG (and the app inside) passes
+  Gatekeeper with no prompts, online or offline — the canonical low-friction macOS
+  install. Correction (2026-06-04, verified): an app dragged out of a *quarantined* DMG
+  still inherits the quarantine xattr, so a DMG has **no** Gatekeeper advantage over a
+  zip until it is notarized. For pre-notarization preview sharing, a `ditto -c -k` zip
+  with an intact ad-hoc signature is the safer artifact (a broken signature removes the
+  "Open Anyway" option entirely); see `distribution/安装说明.txt`.
 - **Signing order:** inside-out — frameworks/dylibs (incl. Sparkle) → embedded
   `.appex` → outer `.app`, all with hardened runtime + secure timestamp. Implemented in
   `scripts/sign.sh`.

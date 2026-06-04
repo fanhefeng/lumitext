@@ -1,8 +1,10 @@
 #!/bin/bash
 #
 # make-dmg.sh — package Lumitext.app into a distributable DMG with an /Applications
-# drag-target. A DMG (vs a zip) is preferred: dragging from a mounted DMG avoids the
-# quarantine xattr that triggers Tahoe's buried "Open Anyway" flow.
+# drag-target. A DMG is the right artifact for NOTARIZED releases (mounts and installs
+# with zero Gatekeeper prompts once stapled). Note: apps dragged from a quarantined DMG
+# still inherit quarantine, so pre-notarization a DMG has no advantage over a zip —
+# share ad-hoc preview builds via scripts/make-share-zip.sh instead (ADR-0002).
 #
 #   ./scripts/make-dmg.sh <path-to-Lumitext.app> [output.dmg]
 #
