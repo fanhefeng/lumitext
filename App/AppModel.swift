@@ -2,10 +2,10 @@
 //  AppModel.swift
 //  Lumitext
 //
-//  Holds the editable LumitextConfig and persists it to the App Group container
-//  (the sole writer; the saver only reads). Persistence is resilient and
-//  off-the-main-thread: if the container is unavailable or slow, the UI keeps
-//  working with an in-memory config and surfaces a status note rather than hanging.
+//  Holds the editable LumitextConfig and persists it to /Users/Shared/Lumitext
+//  (the sole writer; the saver only reads). Persistence is resilient and saves run
+//  off the main thread: if the directory can't be created, the UI keeps working
+//  with an in-memory config and surfaces a status note rather than failing.
 //
 
 import SwiftUI
@@ -15,8 +15,8 @@ import LumitextCore
 @MainActor
 final class AppModel: ObservableObject {
     @Published var config: LumitextConfig
-    /// Non-nil when persistence is unavailable (e.g. running unsandboxed without the
-    /// App Group, or the container is wedged). UI still works; saves are skipped.
+    /// Non-nil when persistence is degraded (e.g. /Users/Shared/Lumitext could not
+    /// be created). UI still works; the warning is shown under the preview.
     @Published var persistenceWarning: String?
 
     /// All installed font families, with "" (system font) first.
@@ -29,18 +29,25 @@ final class AppModel: ObservableObject {
         // System font is represented as "" in the model; show it as a friendly label.
         fontFamilies = [""] + NSFontManager.shared.availableFontFamilies.sorted()
 
+        var warning: String?
         if persist {
-            store = try? ConfigStore.appGroup()
+            // One-time: bring over a config saved by the earlier App-Group builds
+            // (the group container is unreadable for the saver on Tahoe — ADR-0001).
+            ConfigStore.migrateLegacyConfigIfNeeded()
+            do {
+                try ConfigStore.ensureDirectoryExists()
+            } catch {
+                warning = "Couldn't create \(ConfigStore.sharedDirectory.path) — changes won't reach the screensaver (\(error.localizedDescription))"
+            }
+            store = ConfigStore.production()
         } else {
             store = nil
         }
-        if persist && store == nil {
-            persistenceWarning = "App Group container unavailable — changes won't be saved to the screensaver."
-        }
+        persistenceWarning = warning
 
         // Load BEFORE subscribing the autosave, so the initial persisted config can't
         // be clobbered by a save triggered from an async load completing after a user
-        // edit. The host is non-sandboxed so its container read is fast.
+        // edit. The host is non-sandboxed so this read is fast.
         config = store?.load() ?? .default
 
         // Debounced autosave: coalesce rapid edits (typing, slider drags) into one write.

@@ -1,12 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Shipping entitlements for the sandboxed saver appex.
+
+  Config channel: the saver READS /Users/Shared/Lumitext/config.json via the scoped
+  read-only temporary exception below — the same shipped-and-notarized pattern
+  Aerial v4 uses for /Users/Shared/Aerial (ours is scoped to one directory instead
+  of "/"). App Group containers are NOT usable here: on Tahoe, containermanagerd
+  rejects group-container access unless the group ID is prefixed with the
+  requestor's Team ID (TCC enforcement) — see ADR-0001.
+-->
 <plist version="1.0">
 <dict>
 	<key>com.apple.security.app-sandbox</key>
 	<true/>
-	<key>com.apple.security.application-groups</key>
+	<key>com.apple.security.temporary-exception.files.absolute-path.read-only</key>
 	<array>
-		<string>group.io.github.fanhefeng.lumitext</string>
+		<string>/Users/Shared/Lumitext/</string>
 	</array>
 	<key>com.apple.security.temporary-exception.mach-lookup.global-name</key>
 	<array>

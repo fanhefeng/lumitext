@@ -4,8 +4,8 @@
 //
 //  The screensaver view. Hosts the shared SwiftUI renderer (LumitextCore.
 //  LumitextTextView) via NSHostingView so the saver and the host app's live
-//  preview draw identically. Reads the config once from the App Group container
-//  at construction; the host app is the sole writer.
+//  preview draw identically. Reads the config from /Users/Shared/Lumitext at
+//  construction (scoped read-only sandbox exception); the host is the sole writer.
 //
 //  Per-screen instances are independent and hold no mutable shared state, so the
 //  Tahoe multi-monitor pitfalls (which afflicted the leaky legacy host) don't apply
@@ -44,12 +44,12 @@ final class LumitextSaverView: ScreenSaverView {
     }
 
     private func setupHosting() {
-        // Render defaults INSTANTLY (no blocking), then load the real config off the
-        // main thread and swap it in. This never hangs the screen — even if the
-        // sandboxed appex's first App Group container vend is slow on a cold start
-        // (an aggressive synchronous timeout would wrongly fall back to default) —
-        // and is always eventually correct.
-        let host = NSHostingView(rootView: LumitextTextView(config: .default))
+        // Start with a TEXTLESS placeholder (just the default background) so the user
+        // never sees wrong placeholder text, then load the real config off the main
+        // thread and swap it in. Never blocks, never flashes "Hello, Lumitext".
+        var placeholder = LumitextConfig.default
+        placeholder.text = ""
+        let host = NSHostingView(rootView: LumitextTextView(config: placeholder))
         host.frame = bounds
         host.autoresizingMask = [.width, .height]
         addSubview(host)
@@ -57,15 +57,13 @@ final class LumitextSaverView: ScreenSaverView {
         loadConfigAndApply()
     }
 
-    /// Load the user's config from the App Group container off-thread, then apply it
-    /// on the main thread. Logs the resolved path + applied size so the read path is
-    /// verifiable from the unified log without exposing the user's text content.
+    /// Load the user's config from /Users/Shared/Lumitext off-thread (a plain file
+    /// read via the scoped read-only sandbox exception — no containermanagerd vend,
+    /// so it is fast), then apply on the main thread. Logs the path + style metadata
+    /// so the read is verifiable from the unified log without exposing user text.
     private func loadConfigAndApply() {
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            guard let store = try? ConfigStore.appGroup() else {
-                logger.error("App Group container unavailable; keeping default config")
-                return
-            }
+            let store = ConfigStore.production()
             let config = store.load()
             DispatchQueue.main.async {
                 self?.hosting?.rootView = LumitextTextView(config: config)

@@ -66,9 +66,11 @@ log show --last 3m --predicate 'process == "LumitextSaver"' --info
 
 ## Gotchas (verified, see PLAN.md for sources)
 
-- Saver appex is sandboxed: config channel is the App Group container
-  (`group.io.github.fanhefeng.lumitext`); `/Users/Shared` is NOT readable from
-  the appex; `ScreenSaverDefaults` is a ByHost-container trap — never use it.
+- Saver appex is sandboxed: config channel is `/Users/Shared/Lumitext/config.json`
+  (host writes; saver reads via a scoped read-only temporary-exception entitlement —
+  Aerial v4's shipped pattern). App Group containers are REJECTED by Tahoe's TCC
+  unless the group ID is Team-ID-prefixed (impossible with ad-hoc signing) — see
+  ADR-0001 addendum. `ScreenSaverDefaults` is a ByHost-container trap — never use it.
 - `isPreview` from the OS is unreliable on Tahoe (FB19201567) — use the
   frame-width heuristic (< 400pt = preview).
 - System Settings "Options…" button is broken on Tahoe — `SSEHasConfigureSheet`

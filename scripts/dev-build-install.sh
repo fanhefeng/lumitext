@@ -34,9 +34,9 @@ codesign --force --sign - \
     "$APP"
 
 echo "== verify entitlements stuck =="
-codesign -d --entitlements - "$APPEX" 2>&1 | grep -q "application-groups" \
-    && echo "appex: application-groups ✓" \
-    || { echo "appex: application-groups MISSING"; exit 1; }
+codesign -d --entitlements - "$APPEX" 2>&1 | grep -q "/Users/Shared/Lumitext" \
+    && echo "appex: /Users/Shared/Lumitext read exception ✓" \
+    || { echo "appex: shared-dir read exception MISSING"; exit 1; }
 codesign --verify --deep --strict "$APP" && echo "signature valid ✓"
 
 echo "== install to /Applications (pluginkit prefers it; never run from DerivedData) =="
