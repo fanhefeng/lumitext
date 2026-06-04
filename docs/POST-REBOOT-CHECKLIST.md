@@ -1,43 +1,39 @@
-# Post-reboot verification checklist
+# Remaining verification
 
-During M1 development, a dev-trigger (`pkill` of the screensaver engine mid-session)
-wedged two pieces of macOS state that only a **logout/restart** clears:
+## ✅ Already live-verified on macOS 26.5 (2026-06-04)
 
-1. `loginwindow`'s `SACScreenSaverIsRunning` flag is stuck at 1 ("Screen Saver Already
-   Running; Exiting" on launch).
-2. The App Group container `~/Library/Group Containers/group.io.github.fanhefeng.lumitext`
-   has a wedged `containermanagerd` lease — directory *enumeration* hangs (exact-path
-   file I/O still works).
+The core architecture is proven end-to-end on real hardware:
 
-Both are dev-environment artifacts (not product bugs — see `docs/adr/0001`), isolated to
-this app, and harmless to other apps. **After your next reboot/login**, run these to
-complete the live verification that was deferred. None of it requires a Developer ID.
+- The sandboxed `.appex` saver loads and runs as a real screensaver (private
+  ScreenSaver API works on Tahoe).
+- It **reads the exact config the host wrote**, from the shared App Group container —
+  confirmed via the unified log from the live saver process:
+  ```
+  applied config path=…/Group Containers/group.io.github.fanhefeng.lumitext/config.json size=234
+  ```
+- The renderer output (default / CJK / colors / alignment / preview-miniature) and the
+  full host UI were verified by image snapshots.
 
-```bash
-# 0. confirm the wedge cleared
-ls "$HOME/Library/Group Containers/group.io.github.fanhefeng.lumitext"   # should list instantly
+A dev-trigger had briefly wedged the screensaver subsystem during M1; it self-healed
+(leases timed out) and the live verification above was completed afterward.
 
-# 1. rebuild + install fresh
-cd /Users/fhf/IT/code/mac-screen-text
-./scripts/dev-build-install.sh
+## Still worth checking (optional, needs specific conditions)
 
-# 2. verify the saver reads host-written config end-to-end
-#    a) open Lumitext.app, change the text/color/size, quit (autosaves to the container)
-#    b) confirm the config landed:
-cat "$HOME/Library/Group Containers/group.io.github.fanhefeng.lumitext/config.json"
+1. **Multi-monitor** (needs a second display): trigger the screensaver and confirm the
+   text renders independently on BOTH displays with no instance pile-up:
+   ```bash
+   /tmp/lumitext-refs/PaperSaver/.build/release/papersaver set-saver "LumitextSaver"
+   # trigger via a hot corner or real idle; move the real mouse to exit (never pkill)
+   log show --last 2m --predicate 'subsystem == "io.github.fanhefeng.lumitext"' --info \
+     | grep -iE "applied config|deinit"
+   /tmp/lumitext-refs/PaperSaver/.build/release/papersaver set-saver "Hello"   # restore
+   ```
+2. **Clean-account install** (part of the release runbook, RELEASE.md): after the first
+   notarized DMG, drag-install on a second account and confirm no Gatekeeper prompt and
+   the saver appears in System Settings.
 
-# 3. live screensaver test (DO NOT pkill the engine — see CLAUDE.md)
-papersaver=/tmp/lumitext-refs/PaperSaver/.build/release/papersaver
-"$papersaver" set-saver "LumitextSaver"
-#    Trigger via System Settings > Screen Saver preview, or a hot corner, or real idle.
-#    Expect: your styled text full-screen. Move the real mouse to exit.
-#    Restore afterward:  "$papersaver" set-saver "Hello"
+## Dev reminder
 
-# 4. multi-monitor (if you have a second display): trigger and confirm text on BOTH,
-#    each independent, no instance pile-up:
-log show --last 2m --predicate 'subsystem == "io.github.fanhefeng.lumitext"' --info | grep -iE "setupHosting|deinit"
-```
-
-Expected results: config round-trips through the container; the saver shows your text
-on every display; clean init/teardown per activation (no leaked instances). If all pass,
-the architecture is fully validated on real hardware end-to-end.
+Never `pkill`/SIGTERM the screensaver engine or saver — it wedges loginwindow's
+`isRunning` flag and the container lease until logout/reboot. Exit the screensaver with
+real input (mouse/keyboard). See `CLAUDE.md` and `docs/adr/0001`.

@@ -15,7 +15,7 @@
 |---|---|
 | M1 私有 API + App Group 尖兵 | ✅ 真机验证（ADR-0001） |
 | M2 LumitextCore 共享包 + 渲染器 | ✅ 17 单测通过 + ImageRenderer 快照验证 |
-| M3 屏保读 App Group 配置渲染 | ✅ 代码完成（并入 M2/M4）；**真机上屏验证延后到重启后**（见 docs/POST-REBOOT-CHECKLIST.md） |
+| M3 屏保读 App Group 配置渲染 | ✅ **真机端到端验证通过**：沙箱 saver 从共享 App Group 容器读到 host 写入的精确配置（日志 `applied config … size=234`）。仅多显示器待验（docs/POST-REBOOT-CHECKLIST.md） |
 | M4 宿主配置 GUI + 实时预览 + 激活 | ✅ 窗口截图验证（docs/images/） |
 | M5 发布工具链 | ✅ sign/make-dmg 实测可用；公证/Sparkle 待 Developer ID（RELEASE.md） |
 | M6 加固/评审/本地化 | ✅ 两轮多 agent 对抗评审 + zh-Hans 本地化 |
