@@ -19,24 +19,39 @@ Dev signing is ad-hoc (`CODE_SIGN_IDENTITY=-`, no team). Release signing comes v
 
 ## Install & register (dev loop)
 
-pluginkit caches discovered locations and prefers `/Applications` — installing
-anywhere else (or leaving stale DerivedData copies around) loads the WRONG build.
-Always:
+**Use `scripts/dev-build-install.sh` — never raw `xcodebuild` + `cp`.** The Xcode
+project intentionally carries NO `CODE_SIGN_ENTITLEMENTS` (it would demand a
+provisioning profile ad-hoc signing can't provide); the script post-signs the appex
+with `Saver/LumitextSaver.debug.entitlements`. An appex signed WITHOUT
+`com.apple.security.app-sandbox` is **silently filtered out of pkd discovery**
+(verified 2026-06-04): `pluginkit -a` exits 0 but is a no-op, and pkd logs
+`LS reported 0 plug-ins`. Recovery for an already-installed unsigned copy —
+re-sign in place, then re-register:
 
 ```bash
-osascript -e 'tell application "Lumitext" to quit'   # MUST quit first — see below
-rm -rf /Applications/Lumitext.app
-cp -R build/Debug/Lumitext.app /Applications/
+codesign --force --sign - --entitlements Saver/LumitextSaver.debug.entitlements \
+    /Applications/Lumitext.app/Contents/PlugIns/LumitextSaver.appex
+codesign --force --sign - --entitlements App/Lumitext.entitlements /Applications/Lumitext.app
 pluginkit -a /Applications/Lumitext.app/Contents/PlugIns/LumitextSaver.appex
 pluginkit -m -v -p com.apple.screensaver | grep -i lumitext   # verify registration
 ```
 
-**Never replace the bundle while Lumitext.app is running** (learned 2026-06-04):
-repeated rm/cp cycles under a live instance wedged the per-session PlugInKit state —
-`pluginkit -a` started silently no-opping (no pkd log lines, registration invisible
-from ANY path), and neither `pluginkit -r`, `lsregister -f`, nor restarting pkd
-recovered it. Only logout/re-login clears it. The same lag is why
-`ActivationManager.activate()` polls discovery between register and activate.
+pluginkit caches discovered locations and prefers `/Applications` — installing
+anywhere else (or leaving stale DerivedData copies around) loads the WRONG build.
+Quit Lumitext.app (`osascript -e 'tell application "Lumitext" to quit'`) before
+replacing the bundle.
+
+**pkd debugging notes** (verified 2026-06-04):
+- pkd lives in launchd's **user domain**, so it SURVIVES logout/re-login (the
+  earlier "only logout clears it" wedge diagnosis was wrong — that incident was
+  almost certainly the missing-entitlements no-op above). SIP blocks
+  `launchctl kickstart`, but a plain `kill -TERM $(pgrep -x pkd)` is safe: launchd
+  respawns it on demand. (This is NOT ScreenSaverEngine — that stays forbidden.)
+- zsh has a `log` builtin — use `/usr/bin/log stream` or predicates silently break.
+- `pluginkit -a` always exits 0; the ONLY truth is the `pluginkit -m` query plus
+  `/usr/bin/log stream --predicate 'process == "pkd"' --info --debug` (look for
+  "Candidate plugin count from LaunchServices"). The discovery lag is why
+  `ActivationManager.activate()` polls discovery between register and activate.
 
 ## Activate & trigger — SAFE policy (read this; learned the hard way)
 
