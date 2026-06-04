@@ -40,5 +40,17 @@ ditto -x -k "$OUT" "$UNPACK"
 codesign --verify --deep --strict "$UNPACK/Lumitext-$VERSION/Lumitext.app"
 rm -rf "$(dirname "$STAGE")" "$UNPACK"
 
+# Defensive: if the source copy's appex ever got registered with pluginkit (e.g. the
+# app was launched from build/Release), that registration shadows the /Applications
+# install — pkd elects one path per bundle ID, and `pluginkit -a` from anywhere else
+# then silently no-ops (see CLAUDE.md "Install & register"). Deregister the source
+# path so packaging never leaves a stale election behind. Never touch the
+# /Applications copy itself — that's the registration we want to keep.
+APP_ABS="$(cd "$(dirname "$APP")" && pwd)/$(basename "$APP")"
+case "$APP_ABS" in
+  /Applications/*) ;;
+  *) pluginkit -r "$APP_ABS/Contents/PlugIns/LumitextSaver.appex" 2>/dev/null || true ;;
+esac
+
 echo "$OUT"
 shasum -a 256 "$OUT"
