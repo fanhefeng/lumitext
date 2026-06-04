@@ -37,7 +37,8 @@ struct FontPickerField: View {
             )
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.pressable)
+        .help(displayName)
         .accessibilityLabel(Text("Family"))
         .accessibilityValue(displayName)
         .popover(isPresented: $showPicker, arrowEdge: .bottom) {
@@ -94,11 +95,24 @@ private struct FontPickerList: View {
     }
 
     private func row(_ name: String) -> some View {
-        let selected = name == family
-        return Button {
+        FontRow(name: name, selected: name == family) {
             family = name
             dismiss()
-        } label: {
+        }
+    }
+}
+
+/// One popover row with its own hover highlight (LazyVStack rows need per-row
+/// state; a shared style can't tint a row whose resting background is clear).
+private struct FontRow: View {
+    let name: String
+    let selected: Bool
+    let choose: () -> Void
+
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: choose) {
             HStack {
                 (name.isEmpty ? Text("System") : Text(verbatim: name))
                     .font(previewFont(for: name, size: 14))
@@ -113,9 +127,12 @@ private struct FontPickerList: View {
             .padding(.horizontal, Theme.s3)
             .padding(.vertical, 7)
             .contentShape(Rectangle())
-            .background(selected ? Theme.accent.opacity(0.14) : .clear)
+            .background(selected ? Theme.accent.opacity(0.14) : (hovering ? Color.white.opacity(0.06) : .clear))
         }
         .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .help(name.isEmpty ? Text("System") : Text(verbatim: name))
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
 

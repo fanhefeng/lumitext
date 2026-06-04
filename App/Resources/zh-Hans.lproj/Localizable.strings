@@ -2,8 +2,8 @@
 
 /* ConfigPanel sections & labels */
 "Text" = "文字";
-"Font" = "字体";
-"Family" = "字体族";
+"Font" = "文字样式";
+"Family" = "字体";
 "Weight" = "字重";
 "Size" = "字号";
 "Colors" = "颜色";
@@ -17,12 +17,16 @@
 "Top" = "上";
 "Middle" = "中";
 "Bottom" = "下";
+"Type something to display" = "输入要显示的文字…";
+"Text color" = "文字颜色";
+"Background color" = "背景颜色";
+"Text may be hard to read on this background" = "文字与背景颜色过于接近，屏保上可能难以辨认";
 
 /* Preview */
 "Preview" = "预览";
+"Your text will appear here" = "文字将显示在这里";
 
 /* Presets */
-"Presets" = "预设";
 "Midnight" = "深夜";
 "Ink" = "纯黑";
 "Gold" = "鎏金";
@@ -34,27 +38,33 @@
 "System" = "系统字体";
 "Search fonts" = "搜索字体";
 "No fonts match" = "没有匹配的字体";
-"Applies this color preset" = "应用此颜色预设";
+"Applies this color preset" = "应用此配色";
 
-/* Font weights */
+/* Font weights (aligned with Apple's zh weight vocabulary) */
 "Thin" = "极细";
 "Light" = "细体";
 "Regular" = "常规";
 "Medium" = "中等";
-"Semibold" = "半粗";
+"Semibold" = "中粗";
 "Bold" = "粗体";
 "Heavy" = "特粗";
-"Black" = "浓黑";
+"Black" = "黑体";
 
 /* Activation */
 "Move Lumitext to Applications" = "将 Lumitext 移到“应用程序”";
 "macOS only reliably finds the screensaver when the app runs from /Applications." = "只有当 App 位于 /Applications 时，macOS 才能稳定地找到屏保。";
 "Move…" = "移动…";
 "Set as Screen Saver" = "设为屏保";
+"Setting…" = "正在设置…";
+"Screen saver set" = "已设为屏保";
 "Active" = "已启用";
 "Not active" = "未启用";
-"Start after" = "空闲后启动";
-"About “lock screen”" = "关于“锁屏”";
+"Start after" = "闲置后启动";
+"Why text disappears at the lock screen" = "为什么锁屏后文字会消失";
+"Make Lumitext the screen saver on all displays" = "将 Lumitext 设为所有显示器的屏保";
+"How long the Mac must be idle before the screen saver starts" = "Mac 闲置多久后自动启动屏保";
+"The screen saver won't start automatically while set to “Never”." = "设为“永不”时，屏保不会自动启动。";
+"Couldn't set the screen saver." = "未能设置屏保。";
 
 /* Idle-time choices */
 "1 min" = "1 分钟";

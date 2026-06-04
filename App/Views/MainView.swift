@@ -26,10 +26,8 @@ struct MainView: View {
                 PreviewPane(config: model.config)
                 Divider().overlay(Theme.hairline)
                 ActivationBar(activation: activation)
-                Spacer(minLength: 0)
                 if let warn = model.persistenceWarning {
-                    Label(warn, systemImage: "externaldrive.badge.xmark")
-                        .font(.caption).foregroundStyle(.secondary)
+                    persistenceBanner(warn)
                 }
             }
             .padding(Theme.s5)
@@ -38,6 +36,18 @@ struct MainView: View {
         .background(Color(red: 0.055, green: 0.07, blue: 0.13))
         .tint(Theme.accent)
         .preferredColorScheme(.dark)
-        .frame(minWidth: 880, minHeight: 640)
+        .navigationTitle("Lumitext")
+        .frame(minWidth: 880, minHeight: 720)
+    }
+
+    /// "Changes won't reach the screensaver" is an alarm, not a footnote — same
+    /// warning treatment as the move-to-Applications notice.
+    private func persistenceBanner(_ message: String) -> some View {
+        WarningCard(symbol: "externaldrive.badge.xmark") {
+            Text(message)
+                .font(.callout)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
     }
 }

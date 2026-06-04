@@ -25,6 +25,9 @@ final class ActivationManager: ObservableObject {
     @Published var idleTimeSeconds = 0
     @Published var lastError: String?
     @Published var busy = false
+    /// False until refresh() has read the real system state — UI that reacts to
+    /// idleTimeSeconds == 0 must wait for this, or it flashes at launch.
+    @Published var stateLoaded = false
 
     private let paperSaver = PaperSaver()
 
@@ -41,6 +44,7 @@ final class ActivationManager: ObservableObject {
     func refresh() {
         isActiveSaver = paperSaver.getActiveScreensavers().contains(Self.saverModuleName)
         idleTimeSeconds = paperSaver.getIdleTime()
+        stateLoaded = true
     }
 
     /// Register the embedded appex with pluginkit so it appears in System Settings.
@@ -55,11 +59,17 @@ final class ActivationManager: ObservableObject {
         logger.notice("pluginkit -a exit=\(status)")
     }
 
-    /// Set Lumitext as the active screensaver on every display.
-    func setAsScreensaverEverywhere() async {
+    /// The full activation flow — register, then set as the active screensaver on
+    /// every display. One busy window spans both steps so the UI's progress state
+    /// covers the whole multi-second run.
+    func activate() async {
         busy = true
         lastError = nil
         defer { busy = false }
+        await registerExtension()
+        // registerExtension reports failure via lastError (it doesn't throw);
+        // don't claim success by activating a stale registration on top of it.
+        guard lastError == nil else { return }
         do {
             try await paperSaver.setScreensaverEverywhere(module: Self.saverModuleName)
             refresh()

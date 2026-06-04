@@ -28,10 +28,12 @@ struct PositionGrid: View {
         }
     }
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     private func cell(h: LumitextCore.HorizontalAlignment, v: LumitextCore.VerticalAlignment) -> some View {
         let selected = horizontal == h && vertical == v
         return Button {
-            withAnimation(.easeOut(duration: 0.18)) {
+            withAnimation(reduceMotion ? nil : Theme.selectAnim) {
                 horizontal = h
                 vertical = v
             }
@@ -52,7 +54,8 @@ struct PositionGrid: View {
             )
             .contentShape(RoundedRectangle(cornerRadius: Theme.rSmall, style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.pressable)
+        .help(a11yLabel(h: h, v: v))
         .accessibilityLabel(a11yLabel(h: h, v: v))
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
@@ -62,6 +65,6 @@ struct PositionGrid: View {
     private func a11yLabel(h: LumitextCore.HorizontalAlignment, v: LumitextCore.VerticalAlignment) -> Text {
         let vKey: LocalizedStringKey = v == .top ? "Top" : (v == .center ? "Middle" : "Bottom")
         let hKey: LocalizedStringKey = h == .leading ? "Left" : (h == .center ? "Center" : "Right")
-        return Text(vKey) + Text(verbatim: " ") + Text(hKey)
+        return Text("\(Text(vKey)) \(Text(hKey))")
     }
 }

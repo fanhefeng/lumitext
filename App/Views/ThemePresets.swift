@@ -41,10 +41,12 @@ struct ThemePresets: View {
         }
     }
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     private func chip(_ preset: StylePreset) -> some View {
         let selected = config.backgroundColor == preset.background && config.textColor == preset.text
         return Button {
-            withAnimation(.easeOut(duration: 0.2)) {
+            withAnimation(reduceMotion ? nil : Theme.selectAnim) {
                 config.backgroundColor = preset.background
                 config.textColor = preset.text
             }
@@ -68,7 +70,8 @@ struct ThemePresets: View {
             }
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.pressable)
+        .help(Text(preset.nameKey))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(preset.nameKey))
         .accessibilityHint(Text("Applies this color preset"))

@@ -40,10 +40,23 @@ struct PreviewPane: View {
                 LumitextTextView(config: config)
                     .clipShape(RoundedRectangle(cornerRadius: Theme.rScreen, style: .continuous))
                     .padding(7)
+
+                // A blank screen explains itself; tint adapts to the backdrop.
+                if config.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Label("Your text will appear here", systemImage: "text.cursor")
+                        .font(.callout)
+                        .foregroundStyle(
+                            (config.backgroundColor.isLight ? Color.black : Color.white).opacity(0.5)
+                        )
+                        .allowsHitTesting(false)
+                }
             }
             .aspectRatio(16.0 / 10.0, contentMode: .fit)
             .shadow(color: config.backgroundColor.swiftUIColor.opacity(0.45), radius: 26, y: 10)
-            .frame(maxWidth: .infinity)
+            // Fill whatever height the right column offers; the aspect-fit screen
+            // centers inside, so a taller window means a bigger preview instead
+            // of dead space.
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 }

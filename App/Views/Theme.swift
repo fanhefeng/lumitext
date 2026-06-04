@@ -36,6 +36,73 @@ enum Theme {
     static let rSmall: CGFloat = 7
     static let rCard: CGFloat = 12
     static let rScreen: CGFloat = 12
+
+    /// Shared trailing-aligned label column for form rows, so labels and controls
+    /// line up across the Font and Colors cards (HIG settings convention).
+    /// 80pt fits the longest English label ("Background") without wrapping.
+    static let labelColumn: CGFloat = 80
+
+    /// Two-tier motion rhythm: `selectAnim` for selection/state changes,
+    /// `hoverAnim` for micro hover/press feedback (faster on purpose — pointer
+    /// feedback should feel immediate, state changes deliberate).
+    static let selectAnim = Animation.easeOut(duration: 0.18)
+    static let hoverAnim = Animation.easeOut(duration: 0.12)
+}
+
+/// Interaction states for the custom chip/cell/field buttons: hover brightens,
+/// press compresses slightly. `.plain` strips both on macOS; this style restores
+/// them with one shared motion language for every custom control. (Keyboard
+/// focus visibility stays with the system focus ring — Full Keyboard Access
+/// draws it at the AppKit level for any focusable control.)
+struct PressableButtonStyle: ButtonStyle {
+    var radius: CGFloat = Theme.rSmall
+
+    func makeBody(configuration: Configuration) -> some View {
+        Pressable(configuration: configuration, radius: radius)
+    }
+
+    private struct Pressable: View {
+        let configuration: Configuration
+        let radius: CGFloat
+        @State private var hovering = false
+        @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+        var body: some View {
+            configuration.label
+                .brightness(hovering ? 0.07 : 0)
+                .scaleEffect(configuration.isPressed && !reduceMotion ? 0.97 : 1)
+                .animation(reduceMotion ? nil : Theme.hoverAnim, value: hovering)
+                .animation(reduceMotion ? nil : Theme.hoverAnim, value: configuration.isPressed)
+                .onHover { hovering = $0 }
+        }
+    }
+}
+
+extension ButtonStyle where Self == PressableButtonStyle {
+    static var pressable: PressableButtonStyle { .init() }
+    static func pressable(radius: CGFloat) -> PressableButtonStyle { .init(radius: radius) }
+}
+
+/// Shared warning-card chrome (orange tint, hairline, leading icon) used by the
+/// move-to-Applications notice and the persistence-failure banner.
+struct WarningCard<Content: View>: View {
+    let symbol: String
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        HStack(spacing: Theme.s3) {
+            Image(systemName: symbol)
+                .foregroundStyle(Theme.warning)
+            content
+        }
+        .padding(Theme.s3)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.warning.opacity(0.10), in: RoundedRectangle(cornerRadius: Theme.rSmall, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.rSmall, style: .continuous)
+                .strokeBorder(Theme.warning.opacity(0.3), lineWidth: 1)
+        )
+    }
 }
 
 /// Section container with an SF-Symbol header — the grouped "card" used across
