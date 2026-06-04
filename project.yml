@@ -34,6 +34,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: io.github.fanhefeng.lumitext
         INFOPLIST_FILE: App/Info.plist
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         # NOTE: entitlements applied post-build by scripts/dev-sign.sh —
         # CODE_SIGN_ENTITLEMENTS here makes Xcode demand a provisioning
         # profile for the App Groups capability, which ad-hoc dev signing

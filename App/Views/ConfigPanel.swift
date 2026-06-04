@@ -2,9 +2,9 @@
 //  ConfigPanel.swift
 //  Lumitext
 //
-//  The editing controls: text, font family/weight/size, colors, and 9-grid
-//  alignment. Bound directly to the model's LumitextConfig; the debounced
-//  autosave in AppModel persists changes to the screensaver.
+//  The editing controls, organized as section cards on the night-indigo design
+//  language: text → presets → font → colors → position. Bound directly to the
+//  model's LumitextConfig; AppModel's debounced autosave persists changes.
 //
 
 import SwiftUI
@@ -15,60 +15,93 @@ struct ConfigPanel: View {
     let fontFamilies: [String]
 
     var body: some View {
-        Form {
-            Section("Text") {
-                TextEditor(text: $config.text)
-                    .font(.body)
-                    .frame(minHeight: 72)
-                    .scrollContentBackground(.hidden)
-                    .padding(6)
-                    .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
-            }
+        ScrollView {
+            VStack(alignment: .leading, spacing: Theme.s3) {
+                SectionCard(titleKey: "Text", symbol: "character.cursor.ibeam") {
+                    TextEditor(text: $config.text)
+                        .font(.body)
+                        .frame(minHeight: 56, maxHeight: 96)
+                        .scrollContentBackground(.hidden)
+                        .padding(Theme.s2)
+                        .background(Theme.surfaceRaised, in: RoundedRectangle(cornerRadius: Theme.rSmall, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Theme.rSmall, style: .continuous)
+                                .strokeBorder(Theme.hairline, lineWidth: 1)
+                        )
+                }
 
-            Section("Font") {
-                Picker("Family", selection: $config.fontFamily) {
-                    ForEach(fontFamilies, id: \.self) { family in
-                        Text(family.isEmpty ? "System" : family).tag(family)
+                SectionCard(titleKey: "Presets", symbol: "sparkles") {
+                    ThemePresets(config: $config)
+                }
+
+                SectionCard(titleKey: "Font", symbol: "textformat") {
+                    VStack(spacing: Theme.s3) {
+                        LabeledContent {
+                            FontPickerField(family: $config.fontFamily, families: fontFamilies)
+                                .frame(maxWidth: 190)
+                        } label: {
+                            Text("Family")
+                        }
+
+                        LabeledContent {
+                            Picker("", selection: $config.fontWeight) {
+                                ForEach(FontWeight.allCases, id: \.self) { w in
+                                    Text(LocalizedStringKey(w.rawValue.capitalized)).tag(w)
+                                }
+                            }
+                            .labelsHidden()
+                            .accessibilityLabel(Text("Weight"))
+                            .frame(maxWidth: 190)
+                        } label: {
+                            Text("Weight")
+                        }
+
+                        LabeledContent {
+                            HStack(spacing: Theme.s2) {
+                                Slider(value: $config.fontSize, in: 24...480, step: 1)
+                                Text("\(Int(config.fontSize))")
+                                    .font(.system(size: 12, weight: .medium).monospacedDigit())
+                                    .foregroundStyle(.secondary)
+                                    .frame(width: 34, alignment: .trailing)
+                            }
+                        } label: {
+                            Text("Size")
+                        }
                     }
                 }
 
-                Picker("Weight", selection: $config.fontWeight) {
-                    ForEach(FontWeight.allCases, id: \.self) { w in
-                        Text(w.rawValue.capitalized).tag(w)
+                SectionCard(titleKey: "Colors", symbol: "paintpalette") {
+                    VStack(spacing: Theme.s3) {
+                        LabeledContent {
+                            ColorPicker("", selection: $config.textColor.asColor, supportsOpacity: true)
+                                .labelsHidden()
+                                .accessibilityLabel(Text("Text"))
+                        } label: {
+                            Text("Text")
+                        }
+                        LabeledContent {
+                            ColorPicker("", selection: $config.backgroundColor.asColor, supportsOpacity: false)
+                                .labelsHidden()
+                                .accessibilityLabel(Text("Background"))
+                        } label: {
+                            Text("Background")
+                        }
                     }
                 }
 
-                LabeledContent("Size") {
+                SectionCard(titleKey: "Position", symbol: "squareshape.split.3x3") {
                     HStack {
-                        Slider(value: $config.fontSize, in: 24...480, step: 1)
-                        Text("\(Int(config.fontSize))")
-                            .monospacedDigit()
-                            .frame(width: 44, alignment: .trailing)
+                        Spacer(minLength: 0)
+                        PositionGrid(
+                            horizontal: $config.horizontalAlignment,
+                            vertical: $config.verticalAlignment
+                        )
+                        Spacer(minLength: 0)
                     }
                 }
             }
-
-            Section("Colors") {
-                ColorPicker("Text", selection: $config.textColor.asColor, supportsOpacity: true)
-                ColorPicker("Background", selection: $config.backgroundColor.asColor, supportsOpacity: false)
-            }
-
-            Section("Position") {
-                Picker("Horizontal", selection: $config.horizontalAlignment) {
-                    Text("Left").tag(HorizontalAlignment.leading)
-                    Text("Center").tag(HorizontalAlignment.center)
-                    Text("Right").tag(HorizontalAlignment.trailing)
-                }
-                .pickerStyle(.segmented)
-
-                Picker("Vertical", selection: $config.verticalAlignment) {
-                    Text("Top").tag(VerticalAlignment.top)
-                    Text("Middle").tag(VerticalAlignment.center)
-                    Text("Bottom").tag(VerticalAlignment.bottom)
-                }
-                .pickerStyle(.segmented)
-            }
+            .padding(Theme.s4)
         }
-        .formStyle(.grouped)
+        .scrollIndicators(.never)
     }
 }

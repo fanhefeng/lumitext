@@ -21,6 +21,31 @@
 /* Preview */
 "Preview" = "预览";
 
+/* Presets */
+"Presets" = "预设";
+"Midnight" = "深夜";
+"Ink" = "纯黑";
+"Gold" = "鎏金";
+"Neon" = "霓虹";
+"Forest" = "林间";
+"Paper" = "纸白";
+
+/* Font picker */
+"System" = "系统字体";
+"Search fonts" = "搜索字体";
+"No fonts match" = "没有匹配的字体";
+"Applies this color preset" = "应用此颜色预设";
+
+/* Font weights */
+"Thin" = "极细";
+"Light" = "细体";
+"Regular" = "常规";
+"Medium" = "中等";
+"Semibold" = "半粗";
+"Bold" = "粗体";
+"Heavy" = "特粗";
+"Black" = "浓黑";
+
 /* Activation */
 "Move Lumitext to Applications" = "将 Lumitext 移到“应用程序”";
 "macOS only reliably finds the screensaver when the app runs from /Applications." = "只有当 App 位于 /Applications 时，macOS 才能稳定地找到屏保。";

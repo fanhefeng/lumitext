@@ -3,7 +3,7 @@
 //  Lumitext
 //
 //  Install/activation controls + the honest "lock screen" explanation and the
-//  idle-time helper. Lives under the preview on the right side of the window.
+//  idle-time helper, restyled as a section card with a clear status dot.
 //
 
 import SwiftUI
@@ -18,24 +18,12 @@ struct ActivationBar: View {
     ]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: Theme.s3) {
             if !activation.isInApplicationsFolder {
-                GroupBox {
-                    HStack(spacing: 10) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.orange)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Move Lumitext to Applications").font(.subheadline.bold())
-                            Text("macOS only reliably finds the screensaver when the app runs from /Applications.")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        Button("Move…") { activation.moveToApplications() }
-                    }
-                }
+                moveNotice
             }
 
-            HStack(spacing: 12) {
+            HStack(spacing: Theme.s3) {
                 Button {
                     Task {
                         await activation.registerExtension()
@@ -47,29 +35,33 @@ struct ActivationBar: View {
                 .buttonStyle(.borderedProminent)
                 .disabled(activation.busy)
 
-                if activation.isActiveSaver {
-                    Label("Active", systemImage: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
-                } else {
-                    Text("Not active").foregroundStyle(.secondary)
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(activation.isActiveSaver ? Theme.ok : Color.secondary.opacity(0.5))
+                        .frame(width: 7, height: 7)
+                    Text(activation.isActiveSaver ? "Active" : "Not active")
+                        .font(.system(size: 12))
+                        .foregroundStyle(activation.isActiveSaver ? Color.primary : Color.secondary)
                 }
-                Spacer()
+
+                Spacer(minLength: 0)
+
+                HStack(spacing: Theme.s2) {
+                    Text("Start after")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                    Picker("", selection: Binding(
+                        get: { activation.idleTimeSeconds },
+                        set: { activation.setIdleTime($0) }
+                    )) {
+                        ForEach(idleChoices, id: \.1) { Text($0.0).tag($0.1) }
+                    }
+                    .labelsHidden()
+                    .frame(width: 104)
+                }
             }
 
-            HStack {
-                Text("Start after").foregroundStyle(.secondary)
-                Picker("", selection: Binding(
-                    get: { activation.idleTimeSeconds },
-                    set: { activation.setIdleTime($0) }
-                )) {
-                    ForEach(idleChoices, id: \.1) { Text($0.0).tag($0.1) }
-                }
-                .labelsHidden()
-                .frame(width: 120)
-                Spacer()
-            }
-
-            DisclosureGroup("About “lock screen”") {
+            DisclosureGroup {
                 Text(String(localized: "lockScreenExplanation", defaultValue: """
                 Lumitext shows your text while the Mac is idle, in the same window every \
                 screensaver uses. Once macOS fully locks the screen, the system login \
@@ -80,13 +72,48 @@ struct ActivationBar: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 4)
+                .padding(.top, Theme.s1)
+            } label: {
+                Label {
+                    Text("About “lock screen”")
+                        .font(.system(size: 12))
+                } icon: {
+                    Image(systemName: "lock.shield")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
             }
-            .font(.subheadline)
 
             if let err = activation.lastError {
-                Text(err).font(.caption).foregroundStyle(.red)
+                Label {
+                    Text(err).font(.caption)
+                } icon: {
+                    Image(systemName: "exclamationmark.triangle.fill").font(.caption)
+                }
+                .foregroundStyle(.red)
             }
         }
+    }
+
+    private var moveNotice: some View {
+        HStack(spacing: Theme.s3) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(Theme.warning)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Move Lumitext to Applications")
+                    .font(.system(size: 12, weight: .semibold))
+                Text("macOS only reliably finds the screensaver when the app runs from /Applications.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Button("Move…") { activation.moveToApplications() }
+        }
+        .padding(Theme.s3)
+        .background(Theme.warning.opacity(0.10), in: RoundedRectangle(cornerRadius: Theme.rSmall, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.rSmall, style: .continuous)
+                .strokeBorder(Theme.warning.opacity(0.3), lineWidth: 1)
+        )
     }
 }

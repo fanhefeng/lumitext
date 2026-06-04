@@ -3,8 +3,9 @@
 //  Lumitext
 //
 //  The window layout: editing controls on the left, live preview + activation on
-//  the right. Takes plain observed objects so it can be rendered headlessly for
-//  snapshot verification (see LumitextApp's snapshot hook).
+//  the right, on a unified night background. Dark appearance is forced — a
+//  screensaver configurator is a dark-room tool, and the design language
+//  (night indigo, hairlines at white-8%) is tuned for it.
 //
 
 import SwiftUI
@@ -19,11 +20,11 @@ struct MainView: View {
             ConfigPanel(config: $model.config, fontFamilies: model.fontFamilies)
                 .frame(width: 380)
 
-            Divider()
+            Divider().overlay(Theme.hairline)
 
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: Theme.s4) {
                 PreviewPane(config: model.config)
-                Divider()
+                Divider().overlay(Theme.hairline)
                 ActivationBar(activation: activation)
                 Spacer(minLength: 0)
                 if let warn = model.persistenceWarning {
@@ -31,10 +32,12 @@ struct MainView: View {
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }
-            .padding(20)
+            .padding(Theme.s5)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .background(.background)
         }
-        .frame(minWidth: 880, minHeight: 620)
+        .background(Color(red: 0.055, green: 0.07, blue: 0.13))
+        .tint(Theme.accent)
+        .preferredColorScheme(.dark)
+        .frame(minWidth: 880, minHeight: 640)
     }
 }
