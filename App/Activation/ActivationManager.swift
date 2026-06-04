@@ -18,8 +18,8 @@ private let logger = Logger(subsystem: "io.github.fanhefeng.lumitext", category:
 @MainActor
 final class ActivationManager: ObservableObject {
     /// The screensaver's display name as it appears in System Settings / PaperSaver.
-    static let saverModuleName = "LumitextSaver"
-    static let saverBundleID = "io.github.fanhefeng.lumitext.saver"
+    nonisolated static let saverModuleName = "LumitextSaver"
+    nonisolated static let saverBundleID = "io.github.fanhefeng.lumitext.saver"
 
     @Published var isActiveSaver = false
     @Published var idleTimeSeconds = 0
@@ -57,6 +57,20 @@ final class ActivationManager: ObservableObject {
         }
         let status = await Self.runProcessOffMain("/usr/bin/pluginkit", ["-a", path])
         logger.notice("pluginkit -a exit=\(status)")
+        if status != 0 {
+            lastError = String(localized: "registerFailed",
+                               defaultValue: "Couldn't register the screensaver with macOS.")
+        }
+    }
+
+    /// True once system discovery (directory scan + pluginkit) can see the saver.
+    /// Off-main: PaperSaver's listing shells out to /usr/bin/pluginkit.
+    private nonisolated static func saverVisibleToSystem() async -> Bool {
+        await Task.detached(priority: .userInitiated) {
+            PaperSaver().listAvailableScreensavers().contains {
+                $0.name == saverModuleName || $0.identifier == saverBundleID
+            }
+        }.value
     }
 
     /// The full activation flow — register, then set as the active screensaver on
@@ -70,6 +84,24 @@ final class ActivationManager: ObservableObject {
         // registerExtension reports failure via lastError (it doesn't throw);
         // don't claim success by activating a stale registration on top of it.
         guard lastError == nil else { return }
+
+        // `pluginkit -a` returns before the registration is queryable, and
+        // PaperSaver re-discovers modules on every call — activating right away
+        // can throw "Screensaver not found" (observed live on a first click).
+        // Poll discovery briefly so activation never races its own registration.
+        var visible = false
+        for _ in 0..<10 {
+            if await Self.saverVisibleToSystem() { visible = true; break }
+            try? await Task.sleep(for: .milliseconds(400))
+        }
+        guard visible else {
+            lastError = String(localized: "saverNotDiscoverable", defaultValue: """
+            macOS hasn't finished registering the screensaver. Try again in a \
+            moment — if it keeps failing, log out and back in.
+            """)
+            return
+        }
+
         do {
             try await paperSaver.setScreensaverEverywhere(module: Self.saverModuleName)
             refresh()

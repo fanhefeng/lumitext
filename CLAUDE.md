@@ -24,11 +24,19 @@ anywhere else (or leaving stale DerivedData copies around) loads the WRONG build
 Always:
 
 ```bash
+osascript -e 'tell application "Lumitext" to quit'   # MUST quit first — see below
 rm -rf /Applications/Lumitext.app
 cp -R build/Debug/Lumitext.app /Applications/
 pluginkit -a /Applications/Lumitext.app/Contents/PlugIns/LumitextSaver.appex
 pluginkit -m -v -p com.apple.screensaver | grep -i lumitext   # verify registration
 ```
+
+**Never replace the bundle while Lumitext.app is running** (learned 2026-06-04):
+repeated rm/cp cycles under a live instance wedged the per-session PlugInKit state —
+`pluginkit -a` started silently no-opping (no pkd log lines, registration invisible
+from ANY path), and neither `pluginkit -r`, `lsregister -f`, nor restarting pkd
+recovered it. Only logout/re-login clears it. The same lag is why
+`ActivationManager.activate()` polls discovery between register and activate.
 
 ## Activate & trigger — SAFE policy (read this; learned the hard way)
 

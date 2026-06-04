@@ -65,6 +65,8 @@
 "How long the Mac must be idle before the screen saver starts" = "Mac 闲置多久后自动启动屏保";
 "The screen saver won't start automatically while set to “Never”." = "设为“永不”时，屏保不会自动启动。";
 "Couldn't set the screen saver." = "未能设置屏保。";
+"registerFailed" = "未能向 macOS 注册屏保。";
+"saverNotDiscoverable" = "macOS 尚未完成屏保注册。请稍候重试；若持续失败，请注销并重新登录。";
 
 /* Idle-time choices */
 "1 min" = "1 分钟";

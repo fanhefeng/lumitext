@@ -49,7 +49,14 @@ struct ConfigPanel: View {
 
                         row("Size") {
                             HStack(spacing: Theme.s2) {
-                                Slider(value: $config.fontSize, in: 24...480, step: 1)
+                                // Integer values via a rounding binding, NOT `step:` —
+                                // on macOS a stepped Slider renders one tick mark per
+                                // step, and 457 ticks smear into a white line under
+                                // the track.
+                                Slider(value: Binding(
+                                    get: { config.fontSize },
+                                    set: { config.fontSize = $0.rounded() }
+                                ), in: 24...480)
                                     .accessibilityLabel(Text("Size"))
                                 sizeField
                                 Text(verbatim: "pt")
