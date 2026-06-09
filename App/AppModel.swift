@@ -36,7 +36,7 @@ final class AppModel: ObservableObject {
     /// All disk writes go through one FIFO queue, so the synchronous quit-time
     /// flush enqueues last and is guaranteed to land after any async save.
     private static let saveQueue = DispatchQueue(
-        label: "io.github.fanhefeng.lumitext.AppModel.save", qos: .utility)
+        label: "\(Identifiers.subsystem).AppModel.save", qos: .utility)
 
     /// `overrideStore` is the unit-test seam: an injected store (temp
     /// directory) replaces production directory prep entirely, so the init
