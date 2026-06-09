@@ -23,9 +23,16 @@ xcodebuild -project Lumitext.xcodeproj -scheme Lumitext -configuration Debug \
     build SYMROOT="$PWD/build" -quiet
 
 # A prior `xcodebuild test` embeds LumitextAppTests.xctest into the app's
-# PlugIns (TEST_HOST layout) — strip it BEFORE signing (removing it after
-# would break the seal), so tests never ship in an installed copy.
+# PlugIns (TEST_HOST layout) AND injects ~37MB of XCTest/Testing frameworks
+# into Contents/Frameworks. Incremental builds over build/Debug inherit both —
+# strip them BEFORE signing (removing after would break the seal), so tests
+# never ship in an installed or shared copy. A clean app build has no
+# Frameworks dir, so removing the known test frameworks (then the dir if empty)
+# is safe; a future real dependency (e.g. Sparkle) is named explicitly elsewhere.
 rm -rf "$APP"/Contents/PlugIns/*.xctest
+rm -rf "$APP"/Contents/Frameworks/{XCTest,XCTestCore,XCTestSupport,XCTAutomationSupport,XCUIAutomation,XCUnit,Testing}.framework \
+       "$APP"/Contents/Frameworks/libXCTest*.dylib
+rmdir "$APP"/Contents/Frameworks 2>/dev/null || true
 
 echo "== sign (inside-out, ad-hoc + entitlements) =="
 # Dev uses the .debug entitlements (adds disable-library-validation) because
