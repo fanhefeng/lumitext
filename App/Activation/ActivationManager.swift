@@ -174,7 +174,8 @@ final class ActivationManager: ObservableObject {
                 logger.notice("saver discovery: visible after attempt \(attempt)")
                 break
             }
-            try? await Task.sleep(for: .milliseconds(400))
+            // Don't sleep after the final probe — we're about to give up anyway.
+            if attempt < 10 { try? await Task.sleep(for: .milliseconds(400)) }
         }
         guard visible else {
             // The CLAUDE.md-documented failure mode: `pluginkit -a` exits 0 but
@@ -243,6 +244,11 @@ final class ActivationManager: ObservableObject {
     /// button's progress state.
     func moveToApplications() async {
         guard !moving else { return }
+        // Already in /Applications: the swap would copy the running bundle onto
+        // itself (source == dest), needlessly removing and re-creating the live
+        // install. The UI gates the button on this too, but guard here so any
+        // direct/programmatic call is a safe no-op.
+        guard !isInApplicationsFolder else { return }
         report(nil, kind: .move)
         moving = true
         defer { moving = false }

@@ -11,21 +11,24 @@ import SwiftUI
 import LumitextCore
 
 struct StylePreset: Identifiable {
+    // Stable identity is the preset's name, NOT its colors: two presets that
+    // happened to share a background+text pair would collide on a color-derived
+    // id and break ForEach's view identity.
+    let id: String
     let nameKey: LocalizedStringKey
     let background: RGBAColor
     let text: RGBAColor
-    var id: String { "\(background.red),\(background.green),\(background.blue)-\(text.red),\(text.green),\(text.blue)" }
 
     static let all: [StylePreset] = [
-        .init(nameKey: "Midnight", background: .defaultBackground, text: .white),
-        .init(nameKey: "Ink", background: .black, text: .white),
-        .init(nameKey: "Gold", background: RGBAColor(red: 0.07, green: 0.05, blue: 0.03),
+        .init(id: "midnight", nameKey: "Midnight", background: .defaultBackground, text: .white),
+        .init(id: "ink", nameKey: "Ink", background: .black, text: .white),
+        .init(id: "gold", nameKey: "Gold", background: RGBAColor(red: 0.07, green: 0.05, blue: 0.03),
               text: RGBAColor(red: 1.0, green: 0.84, blue: 0.40)),
-        .init(nameKey: "Neon", background: RGBAColor(red: 0.05, green: 0.02, blue: 0.12),
+        .init(id: "neon", nameKey: "Neon", background: RGBAColor(red: 0.05, green: 0.02, blue: 0.12),
               text: RGBAColor(red: 0.42, green: 0.96, blue: 0.93)),
-        .init(nameKey: "Forest", background: RGBAColor(red: 0.04, green: 0.10, blue: 0.07),
+        .init(id: "forest", nameKey: "Forest", background: RGBAColor(red: 0.04, green: 0.10, blue: 0.07),
               text: RGBAColor(red: 0.84, green: 0.95, blue: 0.87)),
-        .init(nameKey: "Paper", background: RGBAColor(red: 0.96, green: 0.95, blue: 0.91),
+        .init(id: "paper", nameKey: "Paper", background: RGBAColor(red: 0.96, green: 0.95, blue: 0.91),
               text: RGBAColor(red: 0.12, green: 0.11, blue: 0.10)),
     ]
 }

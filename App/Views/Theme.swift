@@ -27,6 +27,8 @@ enum Theme {
     /// Status colors.
     static let ok = Color(red: 0.30, green: 0.85, blue: 0.45)
     static let warning = Color.orange
+    /// Hard error (failed activation) — distinct from `warning`'s recoverable orange.
+    static let error = Color.red
 
     /// Spacing rhythm (pt).
     static let s1: CGFloat = 4

@@ -19,7 +19,20 @@ WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
 submit() { # <path-to-zip-or-dmg>
-    xcrun notarytool submit "$1" --keychain-profile "$PROFILE" --wait
+    # `notarytool --wait` exits 0 even when the result is Invalid/Rejected — same
+    # trap as `pluginkit -a` (see CLAUDE.md): the exit code is not the result.
+    # The only truth is the final `status:` line, so stream it live (tee) AND
+    # capture it to assert Accepted; on any other outcome dump the notary log so
+    # we never staple a rejected artifact and report it as success.
+    local out
+    out="$(xcrun notarytool submit "$1" --keychain-profile "$PROFILE" --wait 2>&1 | tee /dev/stderr)"
+    if ! grep -qE 'status:[[:space:]]+Accepted' <<<"$out"; then
+        echo "ERROR: notarization did NOT succeed for $1 (see status above)" >&2
+        local id
+        id="$(grep -oE 'id: [0-9a-f-]{36}' <<<"$out" | head -1 | awk '{print $2}')"
+        [ -n "${id:-}" ] && xcrun notarytool log "$id" --keychain-profile "$PROFILE" >&2 || true
+        return 1
+    fi
 }
 
 echo "== 1. notarize the app (via a zip for submission) =="

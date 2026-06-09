@@ -93,8 +93,8 @@ of which only exist at release time. To enable:
 3. Add to `App/Info.plist`:
    `SUFeedURL` = the raw URL of `appcast.xml`, `SUEnableAutomaticChecks` = `true`.
 4. Wire a `SPUStandardUpdaterController` and a "Check for Updates…" `CommandGroup`
-   in `LumitextApp` (a ready-to-paste `App/Updates/UpdatesController.swift` is described
-   in `docs/adr/0002-distribution-and-updates.md`).
+   in `LumitextApp` (a ready-to-paste snippet for `App/Updates/UpdatesController.swift`
+   — not yet created — is given in `docs/adr/0002-distribution-and-updates.md`).
 5. `sign.sh` already signs `Contents/Frameworks/*` first, so the embedded
    `Sparkle.framework` (and its `Autoupdate`/`Updater.app`) get signed correctly.
 6. Per release: `generate_appcast <dir-with-DMG>` produces the `<item>` (incl.

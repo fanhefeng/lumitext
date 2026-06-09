@@ -197,7 +197,10 @@ public final class ConfigStore: @unchecked Sendable {
             // failure (saver keeps the textless backdrop, host shows defaults)
             // rather than guess. Additive changes don't bump the version, so
             // this only fires on a genuinely breaking future format.
-            guard config.schemaVersion <= LumitextConfig.currentSchemaVersion else {
+            // Reject both newer-than-this-build AND pre-v1 (0/negative) versions:
+            // a sub-1 version means a corrupt or hand-mangled file, never a real
+            // Lumitext write, so treat it as a read failure rather than render it.
+            guard (1...LumitextConfig.currentSchemaVersion).contains(config.schemaVersion) else {
                 return .failed
             }
             return .loaded(config)
@@ -228,11 +231,16 @@ public final class ConfigStore: @unchecked Sendable {
     /// should use (it adds vanished-directory recovery); keeping `save` off the
     /// public surface prevents bypassing that retry contract.
     func save(_ config: LumitextConfig) throws {
-        try ConfigStore.verifyTrustedDirectory(fileURL.deletingLastPathComponent())
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let data = try encoder.encode(config)
+        let dir = fileURL.deletingLastPathComponent()
+        // Verify trust and write in ONE critical section. If the check ran
+        // outside the queue, the directory could be swapped between check and
+        // write — the exact squat the trust check defends against. Serializing
+        // both also keeps concurrent saves from interleaving.
         try ConfigStore.ioQueue.sync {
+            try ConfigStore.verifyTrustedDirectory(dir)
             try data.write(to: fileURL, options: .atomic)
         }
     }

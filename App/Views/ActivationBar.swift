@@ -132,7 +132,7 @@ struct ActivationBar: View {
                     } icon: {
                         Image(systemName: "exclamationmark.triangle.fill").font(.caption)
                     }
-                    .foregroundStyle(.red)
+                    .foregroundStyle(Theme.error)
                     .fixedSize(horizontal: false, vertical: true)
                     // The manual fallback when programmatic activation can't
                     // complete (PLAN.md's documented deep-link escape hatch):
