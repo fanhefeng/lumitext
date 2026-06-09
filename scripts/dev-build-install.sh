@@ -22,6 +22,11 @@ echo "== build =="
 xcodebuild -project Lumitext.xcodeproj -scheme Lumitext -configuration Debug \
     build SYMROOT="$PWD/build" -quiet
 
+# A prior `xcodebuild test` embeds LumitextAppTests.xctest into the app's
+# PlugIns (TEST_HOST layout) — strip it BEFORE signing (removing it after
+# would break the seal), so tests never ship in an installed copy.
+rm -rf "$APP"/Contents/PlugIns/*.xctest
+
 echo "== sign (inside-out, ad-hoc + entitlements) =="
 # Dev uses the .debug entitlements (adds disable-library-validation) because
 # ad-hoc signing has no Team ID for library validation. Release (scripts/sign.sh)
@@ -40,10 +45,52 @@ codesign -d --entitlements - "$APPEX" 2>&1 | grep -q "/Users/Shared/Lumitext" \
 codesign --verify --deep --strict "$APP" && echo "signature valid ✓"
 
 echo "== install to /Applications (pluginkit prefers it; never run from DerivedData) =="
-rm -rf /Applications/Lumitext.app
-cp -R "$APP" /Applications/
+# Quit a running instance first — replacing a live bundle leaves the old code
+# running and confuses LaunchServices (see CLAUDE.md "Install & register").
+osascript -e 'tell application "Lumitext" to quit' 2>/dev/null || true
+# `quit` is asynchronous — wait (bounded) for the process to actually exit.
+# ABORT if it's still alive: swapping the bundle under a live process leaves
+# stale code running and confuses LaunchServices (see CLAUDE.md).
+for _ in $(seq 1 50); do pgrep -xq Lumitext || break; sleep 0.2; done
+if pgrep -xq Lumitext; then
+    echo "ERROR: Lumitext is still running after 10s; quit it and re-run." >&2
+    exit 1
+fi
+
+# Stage-then-swap with a restore path: the old install is moved ASIDE (not
+# deleted) until the new copy fully landed and verified — neither a failed cp
+# (cp -R keeps going past errors, leaving a partial bundle) nor a failed mv
+# may leave /Applications with no working build.
+STAGED="/Applications/.Lumitext-staged-$$.app"
+OLD="/Applications/.Lumitext-old-$$.app"
+# Leftovers from a previous run killed before its trap fired (kill -9, crash).
+# PID-aware: a CONCURRENT run's in-flight staging/backup must never be raided —
+# deleting another run's move-aside backup defeats its restore path.
+for leftover in /Applications/.Lumitext-staged-*.app /Applications/.Lumitext-old-*.app; do
+    [ -e "$leftover" ] || continue
+    pid="${leftover##*-}"; pid="${pid%.app}"
+    if ! kill -0 "$pid" 2>/dev/null; then rm -rf "$leftover"; fi
+done
+trap 'rm -rf "$STAGED" "$OLD"' EXIT
+cp -R "$APP" "$STAGED"
+codesign --verify --deep --strict "$STAGED"
+if [ -d /Applications/Lumitext.app ]; then
+    mv /Applications/Lumitext.app "$OLD"
+fi
+if ! mv "$STAGED" /Applications/Lumitext.app; then
+    if [ -d "$OLD" ]; then
+        mv "$OLD" /Applications/Lumitext.app
+        echo "install failed; previous app restored" >&2
+    fi
+    exit 1
+fi
+rm -rf "$OLD"
 
 echo "== register =="
+# pkd elects ONE path per bundle ID and a build-dir registration shadows the
+# /Applications install (the stale-election wedge — see make-share-zip.sh).
+# Deregister the freshly built copy before registering the installed one.
+pluginkit -r "$PWD/$APPEX" 2>/dev/null || true
 pluginkit -a /Applications/Lumitext.app/Contents/PlugIns/LumitextSaver.appex || true
 sleep 1
 if pluginkit -m -v -p com.apple.screensaver 2>/dev/null | grep -i lumitext; then

@@ -13,7 +13,11 @@ set -euo pipefail
 APP="${1:?usage: make-dmg.sh <Lumitext.app> [output.dmg]}"
 VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist" 2>/dev/null || echo 0.0.0)"
 OUT="${2:-$(dirname "$APP")/Lumitext-$VERSION.dmg}"
-STAGE="$(mktemp -d)/Lumitext"
+# trap (not a tail rm) so the staging dir is cleaned even when a step fails
+# under set -e.
+WORK="$(mktemp -d)"
+trap 'rm -rf "$WORK"' EXIT
+STAGE="$WORK/Lumitext"
 
 mkdir -p "$STAGE"
 cp -R "$APP" "$STAGE/"
@@ -25,6 +29,5 @@ hdiutil create -volname "Lumitext $VERSION" \
     -ov -format UDZO \
     "$OUT" >/dev/null
 
-rm -rf "$(dirname "$STAGE")"
 echo "$OUT"
 shasum -a 256 "$OUT"

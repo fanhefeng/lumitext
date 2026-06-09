@@ -13,6 +13,9 @@ enum Theme {
     /// Interactive accent — night indigo (#6366F1).
     static let accent = Color(red: 0.39, green: 0.40, blue: 0.95)
 
+    /// The unified window backdrop (deep night indigo) the whole UI sits on.
+    static let windowBackground = Color(red: 0.055, green: 0.07, blue: 0.13)
+
     /// Card/group surface on the window background.
     static let surface = Color.white.opacity(0.05)
     /// Slightly raised surface (e.g. inputs on a card).
@@ -55,15 +58,12 @@ enum Theme {
 /// focus visibility stays with the system focus ring — Full Keyboard Access
 /// draws it at the AppKit level for any focusable control.)
 struct PressableButtonStyle: ButtonStyle {
-    var radius: CGFloat = Theme.rSmall
-
     func makeBody(configuration: Configuration) -> some View {
-        Pressable(configuration: configuration, radius: radius)
+        Pressable(configuration: configuration)
     }
 
     private struct Pressable: View {
         let configuration: Configuration
-        let radius: CGFloat
         @State private var hovering = false
         @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -80,7 +80,20 @@ struct PressableButtonStyle: ButtonStyle {
 
 extension ButtonStyle where Self == PressableButtonStyle {
     static var pressable: PressableButtonStyle { .init() }
-    static func pressable(radius: CGFloat) -> PressableButtonStyle { .init(radius: radius) }
+}
+
+extension View {
+    /// Shared input-field chrome: a raised surface fill plus a hairline border,
+    /// used by the text editor, the size field, and the font-picker trigger so
+    /// the "editable control" look is defined once. `cornerRadius` defaults to
+    /// `Theme.rSmall`; smaller fields (e.g. the inline size field) pass less.
+    func inputFieldChrome(cornerRadius: CGFloat = Theme.rSmall) -> some View {
+        background(Theme.surfaceRaised, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .strokeBorder(Theme.hairline, lineWidth: 1)
+            )
+    }
 }
 
 /// Shared warning-card chrome (orange tint, hairline, leading icon) used by the

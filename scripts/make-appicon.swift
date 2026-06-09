@@ -1,7 +1,7 @@
 //
 //  make-appicon.swift
 //  Generates the macOS AppIcon set: a night-indigo rounded-rect with a glowing
-//  "Aa" — the product in one glyph. Run from the repo root:
+//  "Aa" — the product in one glyph. Works from any cwd:
 //      swift scripts/make-appicon.swift
 //
 //  Draws the 1024 master with explicit pixel dimensions (Retina-safe), then
@@ -11,7 +11,12 @@
 
 import AppKit
 
-let outDir = "App/Assets.xcassets/AppIcon.appiconset"
+// Anchor output to the repo root via this script's own location, so the script
+// works regardless of the caller's cwd.
+let repoRoot = URL(fileURLWithPath: #filePath)
+    .deletingLastPathComponent()  // scripts/
+    .deletingLastPathComponent()  // repo root
+let outDir = repoRoot.appendingPathComponent("App/Assets.xcassets/AppIcon.appiconset").path
 try? FileManager.default.createDirectory(atPath: outDir, withIntermediateDirectories: true)
 
 func renderMaster(px: Int) -> NSBitmapImageRep {

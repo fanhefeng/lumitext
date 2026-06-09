@@ -33,7 +33,7 @@ struct MainView: View {
             .padding(Theme.s5)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
-        .background(Color(red: 0.055, green: 0.07, blue: 0.13))
+        .background(Theme.windowBackground)
         .tint(Theme.accent)
         .preferredColorScheme(.dark)
         .navigationTitle("Lumitext")

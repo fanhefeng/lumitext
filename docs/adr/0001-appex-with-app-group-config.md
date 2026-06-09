@@ -45,15 +45,27 @@ hosted by `com.apple.wallpaper.agent`, running as a real screensaver.
 - **`/Users/Shared` read DENIED from the appex sandbox** (the negative control).
   Documented by research and by Apple's own savers carrying a
   `temporary-exception.files.absolute-path.read-only=/` entitlement a third party
-  cannot notarize. We therefore do **not** use `/Users/Shared` as a production channel.
+  cannot notarize. *(Superseded — both halves of this analysis proved wrong, see
+  Addendum: notarization does not police entitlements, and a SCOPED
+  temporary-exception read of `/Users/Shared/Lumitext/` succeeds from the saver
+  sandbox. `/Users/Shared` IS the shipped production channel.)*
 
 ## Decision
 
-Proceed exactly as planned:
+(As revised 2026-06-04 — the Addendum below records the diagnosis that forced the
+config-channel change. The body states the CURRENT decision so it can't be
+mistaken for the superseded one.)
+
 - Saver = ExtensionKit `.appex` (NOT legacy `.saver`).
-- Config channel = **App Group container** `group.io.github.fanhefeng.lumitext`
-  (host app = sole writer; appex = reader). No `ScreenSaverDefaults`, no `/Users/Shared`
-  production path.
+- Config channel = **`/Users/Shared/Lumitext/config.json`** — host app = sole
+  writer; the sandboxed appex reads it via a **scoped**
+  `com.apple.security.temporary-exception.files.absolute-path.read-only` for
+  `/Users/Shared/Lumitext/` (Aerial v4's shipped-and-notarized pattern). No
+  `ScreenSaverDefaults`.
+- *Originally:* App Group container `group.io.github.fanhefeng.lumitext` —
+  **superseded**: Tahoe's TCC rejects group containers whose ID isn't prefixed
+  by the requestor's Team ID, which ad-hoc signing can never satisfy (see
+  Addendum).
 - `SSEHasConfigureSheet=false`, `SSENeedsAnimationTimer=false`; config lives 100% in the host app.
 
 ## Addendum (2026-06-04): App Group channel REJECTED by Tahoe TCC → /Users/Shared
@@ -81,7 +93,8 @@ original analysis:
   are not MAS. Aerial v4 ships exactly this.
 - The App Group channel can be revisited once a real Team ID exists (use a
   team-prefixed ID, e.g. `TEAMID.lumitext`), trading world-readability for container
-  privacy. The host migrates any legacy group-container config on first launch.
+  privacy. (A one-time migration shim shipped during the transition was later
+  removed as dead code — no released build ever wrote to the group container.)
 - The saver also no longer waits on `containermanagerd` at startup: the read is a
   plain sandboxed file read (instant). The saver renders a TEXTLESS background first
   and swaps the loaded config in — never flashes wrong placeholder text.

@@ -8,6 +8,8 @@
 //
 
 import SwiftUI
+import CoreText
+import LumitextCore
 
 struct FontPickerField: View {
     @Binding var family: String
@@ -30,11 +32,7 @@ struct FontPickerField: View {
             }
             .padding(.horizontal, Theme.s3)
             .padding(.vertical, 6)
-            .background(Theme.surfaceRaised, in: RoundedRectangle(cornerRadius: Theme.rSmall, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: Theme.rSmall, style: .continuous)
-                    .strokeBorder(Theme.hairline, lineWidth: 1)
-            )
+            .inputFieldChrome()
             .contentShape(Rectangle())
         }
         .buttonStyle(.pressable)
@@ -61,7 +59,9 @@ private struct FontPickerList: View {
     private var filtered: [String] {
         let q = query.trimmingCharacters(in: .whitespaces)
         guard !q.isEmpty else { return families }
-        return families.filter { $0.localizedCaseInsensitiveContains(q) }
+        // Keep the "" (System) sentinel reachable while searching — it can never
+        // match a text query, and hiding it strands users away from the system font.
+        return families.filter { $0.isEmpty || $0.localizedCaseInsensitiveContains(q) }
     }
 
     var body: some View {
@@ -140,4 +140,43 @@ private struct FontRow: View {
 /// the system font when a family fails to resolve.
 func previewFont(for family: String, size: CGFloat) -> Font {
     family.isEmpty ? .system(size: size) : .custom(family, size: size)
+}
+
+/// Detects families whose font file lives OUTSIDE the system-wide font
+/// locations a sandboxed process can read. The non-sandboxed host (and thus the
+/// live preview) can render fonts from anywhere — the user's home folder, an
+/// app's own bundle/container (font managers, Adobe apps), network mounts — but
+/// the saver's sandbox only reaches /System/Library and /Library/Fonts, so for
+/// every other origin it silently falls back to the system font. That's the one
+/// class of fonts where the preview would over-promise; ConfigPanel shows a
+/// warning instead of letting WYSIWYG silently diverge.
+@MainActor
+enum FontCatalog {
+    private static var divergenceCache: [String: Bool] = [:]
+
+    /// Forget cached verdicts — fonts can be (un)installed mid-session; the
+    /// host calls this whenever its family list changes.
+    static func invalidate() {
+        divergenceCache.removeAll()
+    }
+
+    static func mayNotResolveInSaver(_ family: String) -> Bool {
+        guard !family.isEmpty else { return false }   // system font: always resolves
+        if let cached = divergenceCache[family] { return cached }
+        var result = false
+        let query = CTFontDescriptorCreateWithAttributes(
+            [kCTFontFamilyNameAttribute: family] as CFDictionary)
+        if let matched = CTFontDescriptorCreateMatchingFontDescriptor(query, nil),
+           let cfURL = CTFontDescriptorCopyAttribute(matched, kCTFontURLAttribute),
+           let url = cfURL as? URL {
+            // Resolve symlinks so a planted/aliased path can't dodge the
+            // check; the path policy itself lives in Core where it's tested.
+            let path = url.standardizedFileURL.resolvingSymlinksInPath().path
+            result = FontPathPolicy.mayNotResolveInSaver(fontAt: path)
+        }
+        // No URL resolved → the HOST can't render it either, so preview and
+        // saver agree (both fall back) — no divergence to warn about.
+        divergenceCache[family] = result
+        return result
+    }
 }

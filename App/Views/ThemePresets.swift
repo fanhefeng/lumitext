@@ -44,7 +44,11 @@ struct ThemePresets: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private func chip(_ preset: StylePreset) -> some View {
-        let selected = config.backgroundColor == preset.background && config.textColor == preset.text
+        // Approximate, not exact: a preset color that round-trips through the
+        // ColorPicker (RGBAColor → NSColor → RGBAColor) drifts below display
+        // precision, and exact Double == would silently de-highlight the chip.
+        let selected = config.backgroundColor.isApproximately(preset.background)
+            && config.textColor.isApproximately(preset.text)
         return Button {
             withAnimation(reduceMotion ? nil : Theme.selectAnim) {
                 config.backgroundColor = preset.background

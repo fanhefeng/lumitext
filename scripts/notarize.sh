@@ -15,13 +15,15 @@ set -euo pipefail
 APP="${1:?usage: notarize.sh <signed-Lumitext.app>}"
 PROFILE="${LUMITEXT_NOTARY_PROFILE:?set LUMITEXT_NOTARY_PROFILE to a stored notarytool profile}"
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
+WORK="$(mktemp -d)"
+trap 'rm -rf "$WORK"' EXIT
 
 submit() { # <path-to-zip-or-dmg>
     xcrun notarytool submit "$1" --keychain-profile "$PROFILE" --wait
 }
 
 echo "== 1. notarize the app (via a zip for submission) =="
-APPZIP="$(mktemp -d)/Lumitext.zip"
+APPZIP="$WORK/Lumitext.zip"
 ditto -c -k --keepParent "$APP" "$APPZIP"
 submit "$APPZIP"
 
@@ -30,7 +32,11 @@ xcrun stapler staple "$APP"
 xcrun stapler validate "$APP"
 
 echo "== 3. build DMG around the stapled app =="
-DMG="$("$REPO/scripts/make-dmg.sh" "$APP" | head -1)"
+# NOT `make-dmg.sh | head -1`: make-dmg prints two lines (path + shasum), and
+# head exiting after the first would SIGPIPE the producer — exit 141 under
+# pipefail, killing the pipeline right after building an un-notarized DMG.
+DMG_OUT="$("$REPO/scripts/make-dmg.sh" "$APP")"
+DMG="${DMG_OUT%%$'\n'*}"
 
 echo "== 4. notarize + staple the DMG (double-staple) =="
 submit "$DMG"
@@ -38,6 +44,9 @@ xcrun stapler staple "$DMG"
 xcrun stapler validate "$DMG"
 
 echo "== 5. final Gatekeeper check =="
-spctl -a -vvv -t install "$DMG" || true
+# Disk images are assessed under the `open` policy with the primary-signature
+# context (Apple's documented notarization check) — `-t install` is for
+# installer .pkgs and rejects everything else.
+spctl -a -vvv -t open --context context:primary-signature "$DMG" || true
 echo "release artifact: $DMG"
 shasum -a 256 "$DMG"

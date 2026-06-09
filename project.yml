@@ -2,9 +2,10 @@ name: Lumitext
 options:
   createIntermediateGroups: true
   developmentLanguage: en
+  # en = inline default-value strings (development language); zh-Hans has a real
+  # .lproj under App/Resources. No Base.lproj exists — don't declare one.
   knownRegions:
     - en
-    - Base
     - zh-Hans
   deploymentTarget:
     macOS: "26.0"
@@ -35,10 +36,10 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: io.github.fanhefeng.lumitext
         INFOPLIST_FILE: App/Info.plist
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        # NOTE: entitlements applied post-build by scripts/dev-sign.sh —
-        # CODE_SIGN_ENTITLEMENTS here makes Xcode demand a provisioning
-        # profile for the App Groups capability, which ad-hoc dev signing
-        # cannot satisfy. Release signing (M5) signs with entitlements too.
+        # NOTE: entitlements applied post-build by scripts/dev-build-install.sh
+        # (release: scripts/sign.sh) — declaring CODE_SIGN_ENTITLEMENTS here
+        # triggers Xcode's provisioning checks, which ad-hoc dev signing cannot
+        # satisfy. `codesign` itself has no such check.
         PRODUCT_NAME: Lumitext
     dependencies:
       - target: LumitextSaver
@@ -62,6 +63,24 @@ targets:
     dependencies:
       - sdk: ScreenSaver.framework
       - package: LumitextCore
+  # Hosted unit tests for the app layer (AppModel decision table, the move
+  # swap algorithm, the /Applications gate) — Core has its own SPM tests; this
+  # target exists so app-side load-bearing logic is no longer structurally
+  # untestable. Run via: xcodebuild test -scheme Lumitext (launches the app as
+  # the test host).
+  LumitextAppTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - AppTests
+    dependencies:
+      - target: Lumitext
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.fanhefeng.lumitext.apptests
+        GENERATE_INFOPLIST_FILE: true
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Lumitext.app/Contents/MacOS/Lumitext"
+        BUNDLE_LOADER: "$(TEST_HOST)"
 schemes:
   Lumitext:
     build:
@@ -69,5 +88,9 @@ schemes:
         Lumitext: all
     run:
       config: Debug
+    test:
+      config: Debug
+      targets:
+        - LumitextAppTests
     archive:
       config: Release

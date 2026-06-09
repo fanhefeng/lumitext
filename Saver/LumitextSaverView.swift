@@ -17,7 +17,7 @@ import SwiftUI
 import LumitextCore
 import os.log
 
-private let logger = Logger(subsystem: "io.github.fanhefeng.lumitext", category: "Saver")
+private let logger = Logger(subsystem: Identifiers.subsystem, category: "Saver")
 
 final class LumitextSaverView: ScreenSaverView {
 
@@ -64,13 +64,48 @@ final class LumitextSaverView: ScreenSaverView {
     private func loadConfigAndApply() {
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             let store = ConfigStore.production()
-            let config = store.load()
+            let result = store.loadResult()
             DispatchQueue.main.async {
-                self?.hosting?.rootView = LumitextTextView(config: config)
-                logger.notice("applied config path=\(store.path, privacy: .public) family=\(config.fontFamily, privacy: .public) size=\(config.fontSize, privacy: .public)")
+                // Bind first so the apply and its log line are atomic — an
+                // optional-chained assignment would log "applied" even when the
+                // view was torn down and the result silently dropped.
+                guard let self, let hosting = self.hosting else {
+                    logger.notice("view torn down before config apply; result discarded")
+                    return
+                }
+                // The render policy (loaded → user config; missing → onboarding
+                // default; failed → NOT the user's text, because a read problem
+                // must not masquerade as lost text) is the tested
+                // LoadResult.configToRender — this is just the thin apply shim.
+                if let config = result.configToRender {
+                    hosting.rootView = LumitextTextView(config: config)
+                    // family is .private: a font choice is user data (the text
+                    // itself is already deliberately never logged).
+                    logger.notice("applied config path=\(store.path, privacy: .public) family=\(config.fontFamily, privacy: .private) size=\(config.fontSize, privacy: .public)")
+                } else {
+                    // A silent blank screen is undiagnosable for a non-technical
+                    // user (the HOST reads the same file fine, so its preview
+                    // looks correct and shows no warning). Render a small
+                    // diagnostic hint instead of user-text — bilingual literal
+                    // because the saver bundle ships no string tables.
+                    hosting.rootView = LumitextTextView(config: Self.readFailureHint)
+                    logger.error("config unreadable at \(store.path, privacy: .public); showing read-failure hint")
+                }
             }
         }
     }
+
+    /// Shown when the config exists but can't be read from the saver's sandbox
+    /// (broken scoped exception, permissions drift). Deliberately small and
+    /// diagnostic — it must read as a system note, never as the user's text.
+    private static let readFailureHint: LumitextConfig = {
+        var hint = LumitextConfig.default
+        hint.text = "Lumitext couldn't read its settings — open the Lumitext app to fix this.\nLumitext 无法读取设置——请打开 Lumitext 应用检查。"
+        hint.fontSize = 36
+        hint.fontWeight = .regular
+        hint.textColor = RGBAColor(red: 1, green: 1, blue: 1, alpha: 0.55)
+        return hint
+    }()
 
     // ScreenSaverView animation hooks are unused: SwiftUI self-drives any animation
     // and SSENeedsAnimationTimer=false, so we don't override animateOneFrame().

@@ -7,7 +7,6 @@
 //
 
 import SwiftUI
-import LumitextCore
 
 struct ActivationBar: View {
     @ObservedObject var activation: ActivationManager
@@ -20,6 +19,19 @@ struct ActivationBar: View {
         ("1 min", 60), ("2 min", 120), ("5 min", 300),
         ("10 min", 600), ("20 min", 1200), ("Never", 0),
     ]
+
+    /// The system value may be something we don't offer (set via System
+    /// Settings, e.g. 3 min) — inject it so the Picker never shows a blank
+    /// selection.
+    private var pickerChoices: [(LocalizedStringKey, Int)] {
+        let current = activation.idleTimeSeconds
+        guard activation.stateLoaded,
+              !idleChoices.contains(where: { $0.1 == current }) else { return idleChoices }
+        let label: LocalizedStringKey = current % 60 == 0
+            ? "\(current / 60) min"
+            : "\(current) s"
+        return idleChoices + [(label, current)]
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.s3) {
@@ -40,6 +52,11 @@ struct ActivationBar: View {
                 }
                 .animation(reduceMotion ? nil : Theme.selectAnim, value: activation.isActiveSaver)
                 .help(activation.isActiveSaver ? Text("Active") : Text("Not active"))
+                // One labeled status element — a bare "Active" Text floating in
+                // the VoiceOver order doesn't say active WHAT.
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(Text("Screen saver status"))
+                .accessibilityValue(activation.isActiveSaver ? Text("Active") : Text("Not active"))
 
                 Spacer(minLength: 0)
 
@@ -47,14 +64,23 @@ struct ActivationBar: View {
                     Text("Start after")
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
+                        // The Picker carries its own accessibilityLabel below;
+                        // leaving this visual label visible to VoiceOver makes
+                        // it announce "Start after" twice.
+                        .accessibilityHidden(true)
                     Picker("", selection: Binding(
                         get: { activation.idleTimeSeconds },
                         set: { activation.setIdleTime($0) }
                     )) {
-                        ForEach(idleChoices, id: \.1) { Text($0.0).tag($0.1) }
+                        ForEach(pickerChoices, id: \.1) { Text($0.0).tag($0.1) }
                     }
                     .labelsHidden()
                     .frame(width: 104)
+                    // Disabled while activate()/move are in flight: setIdleTime
+                    // shares the lastError channel, and a failure reported while
+                    // activate() is suspended would be silently wiped by its
+                    // success-path refresh().
+                    .disabled(activation.busy || activation.moving)
                     .accessibilityLabel(Text("Start after"))
                     .help("How long the Mac must be idle before the screen saver starts")
                 }
@@ -94,17 +120,40 @@ struct ActivationBar: View {
             }
 
             if let err = activation.lastError {
-                Label {
-                    // Text(verbatim:) keeps the runtime error string out of the
-                    // LocalizedStringKey format machinery (err may contain '%').
-                    Text("\(Text("Couldn't set the screen saver.")) \(Text(verbatim: err))")
-                        .font(.caption)
-                } icon: {
-                    Image(systemName: "exclamationmark.triangle.fill").font(.caption)
+                VStack(alignment: .leading, spacing: Theme.s1) {
+                    Label {
+                        // Errors are self-contained, localized sentences set at the
+                        // source (ActivationManager) — no hardcoded prefix, which
+                        // used to mislabel e.g. a move failure as a set failure.
+                        // Text(verbatim:) keeps the runtime string out of the
+                        // LocalizedStringKey format machinery (err may contain '%').
+                        Text(verbatim: err)
+                            .font(.caption)
+                    } icon: {
+                        Image(systemName: "exclamationmark.triangle.fill").font(.caption)
+                    }
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+                    // The manual fallback when programmatic activation can't
+                    // complete (PLAN.md's documented deep-link escape hatch):
+                    // let the user finish the job in System Settings directly.
+                    Button("Open Screen Saver Settings…") {
+                        activation.openScreenSaverSettings()
+                    }
+                    .buttonStyle(.link)
+                    .font(.caption)
                 }
-                .foregroundStyle(.red)
-                .fixedSize(horizontal: false, vertical: true)
                 .transition(.opacity.combined(with: .move(edge: .top)))
+                .onAppear {
+                    AccessibilityNotification.Announcement(err).post()
+                }
+                // One error replacing another in place (A → B without passing
+                // through nil) reuses this view, so .onAppear won't refire —
+                // announce the new text too, or VoiceOver users hear only the
+                // stale first error.
+                .onChange(of: err) { _, newErr in
+                    AccessibilityNotification.Announcement(newErr).post()
+                }
             }
         }
         .animation(reduceMotion ? nil : Theme.selectAnim, value: activation.lastError)
@@ -128,18 +177,23 @@ struct ActivationBar: View {
                     ProgressView().controlSize(.small)
                     Text("Setting…")
                 }
-            } else if justActivated {
+            } else if justActivated && activation.isActiveSaver {
+                // && isActiveSaver: if the user deactivates the saver externally
+                // (System Settings) inside the 2.5s confirmation window, the
+                // green checkmark must not keep contradicting the status dot.
                 Label("Screen saver set", systemImage: "checkmark.circle.fill")
             } else {
                 Label("Set as Screen Saver", systemImage: "sparkles.tv")
             }
         }
         .buttonStyle(.borderedProminent)
-        .tint(justActivated ? Theme.ok : Theme.accent)
+        .tint(justActivated && activation.isActiveSaver ? Theme.ok : Theme.accent)
         .keyboardShortcut(.defaultAction)
         // Also disabled during the green confirmation window — a second click
         // there would race a second activate() Task against the reset sleep.
-        .disabled(activation.busy || justActivated)
+        // And outside /Applications: registering from a wrong path wedges pkd's
+        // single-path election (the moveNotice above explains what to do).
+        .disabled(activation.busy || activation.moving || justActivated || !activation.isInApplicationsFolder)
         .help("Make Lumitext the screen saver on all displays")
     }
 
@@ -153,7 +207,19 @@ struct ActivationBar: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            Button("Move…") { activation.moveToApplications() }
+            Button {
+                Task { await activation.moveToApplications() }
+            } label: {
+                if activation.moving {
+                    HStack(spacing: 6) {
+                        ProgressView().controlSize(.small)
+                        Text("Moving…")
+                    }
+                } else {
+                    Text("Move…")
+                }
+            }
+            .disabled(activation.moving || activation.busy)
         }
     }
 }

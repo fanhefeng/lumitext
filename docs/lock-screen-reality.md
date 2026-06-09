@@ -18,9 +18,12 @@ and only one is achievable by a third-party app. Lumitext is honest about which.
 
 - It renders your styled text as the **idle screensaver**, full-screen, on every display.
 - In the app, the **idle delay** ("Start after") controls how soon your text appears.
-- The honest framing in the app's "About lock screen" panel: to maximize the time your
-  text is visible, set the system's **"require password" delay to begin a little after**
-  the screensaver starts. During that grace window your text is on screen; after it, the
+- The honest framing in the app's **"Why text disappears at the lock screen"** panel
+  (the DisclosureGroup in ActivationBar): to maximize the time your text is visible,
+  set the system's **"require password" delay to begin a little after** the
+  screensaver starts. The app only *instructs* — it has no control over the
+  require-password delay (no public API), so copy must never promise an in-app
+  "align" action. During that grace window your text is on screen; after it, the
   OS lock takes over (as it must, for security).
 
 ## What we must NOT claim

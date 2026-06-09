@@ -24,6 +24,10 @@ REPO="$(cd "$(dirname "$0")/.." && pwd)"
 APP_ENT="$REPO/App/Lumitext.entitlements"
 SAVER_ENT="$REPO/Saver/LumitextSaver.entitlements"
 
+# A prior `xcodebuild test` embeds the hosted test bundle into PlugIns — strip
+# it BEFORE signing (it must never ship, and notarization would choke on it).
+rm -rf "$APP"/Contents/PlugIns/*.xctest
+
 if [ "$IDENTITY" = "-" ]; then
     echo "WARNING: signing ad-hoc (-). Result is NOT notarizable; for local testing only."
     RUNTIME_FLAGS=()
@@ -42,15 +46,23 @@ sign() { # <entitlements-or-""> <path>
 }
 
 echo "== 1. nested frameworks & dylibs (deepest first) =="
-# Sign any embedded frameworks (e.g. Sparkle) and their nested helpers, then loose dylibs.
+# Sign nested code strictly inside-out: helpers and dylibs INSIDE a framework
+# must be signed BEFORE the enclosing .framework, or re-signing them afterwards
+# breaks the framework's seal.
 if [ -d "$APP/Contents/Frameworks" ]; then
-    # XPCServices / helper apps inside frameworks (e.g. Sparkle's Autoupdate, Updater.app)
+    # 1a. XPCServices / helper apps inside frameworks (e.g. Sparkle's Updater.app)
     find "$APP/Contents/Frameworks" \( -name "*.xpc" -o -name "*.app" \) -print0 |
         while IFS= read -r -d '' item; do sign "" "$item"; done
-    find "$APP/Contents/Frameworks" -type d -name "*.framework" -print0 |
-        while IFS= read -r -d '' fw; do sign "" "$fw"; done
+    # 1a'. BARE executable helpers (Sparkle ships Autoupdate as a plain Mach-O,
+    # not an .app/.xpc — the patterns above miss it and notarization would fail)
+    find "$APP/Contents/Frameworks" -type f -name "Autoupdate" -print0 |
+        while IFS= read -r -d '' helper; do sign "" "$helper"; done
+    # 1b. ALL dylibs (framework-internal and loose) — before the framework shells
     find "$APP/Contents/Frameworks" -type f -name "*.dylib" -print0 |
         while IFS= read -r -d '' dy; do sign "" "$dy"; done
+    # 1c. the framework bundles themselves, last
+    find "$APP/Contents/Frameworks" -type d -name "*.framework" -print0 |
+        while IFS= read -r -d '' fw; do sign "" "$fw"; done
 fi
 
 echo "== 2. embedded screensaver extension =="
@@ -63,6 +75,10 @@ echo "== verify =="
 codesign --verify --deep --strict --verbose=2 "$APP"
 if [ "$IDENTITY" != "-" ]; then
     echo "== Gatekeeper assessment =="
-    spctl -a -vvv -t install "$APP" || echo "(spctl will pass only after notarization+staple)"
+    # `--type exec` (the default policy) is the correct assessment for an .app;
+    # `-t install` is the installer-package policy and ALWAYS rejects app
+    # bundles, even correctly notarized ones.
+    spctl -a -vvv --type exec "$APP" \
+        || echo "(rejected: expected before notarization+staple; rerun after notarize.sh)"
 fi
 echo "signed: $APP"

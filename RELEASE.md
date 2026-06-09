@@ -2,7 +2,8 @@
 
 Lumitext ships as a **Developer-ID-signed, notarized DMG** (primary) plus a **Homebrew
 cask** (secondary). It is NOT distributed via the Mac App Store — `.appex` screensavers
-using the private ScreenSaver API and the App-Group install model are not MAS-eligible.
+using the private ScreenSaver API and the `/Users/Shared` temporary-exception config
+channel are not MAS-eligible.
 
 Everything below is automated by `scripts/`; the only prerequisites are owner-only
 accounts (see PLAN.md M0). All scripts live in `scripts/` and are idempotent.
@@ -21,16 +22,20 @@ accounts (see PLAN.md M0). All scripts live in `scripts/` and are idempotent.
      --apple-id you@example.com --team-id TEAMID --password <app-specific-password>
    export LUMITEXT_NOTARY_PROFILE=lumitext-notary
    ```
-4. **App Group**: the entitlements use `group.io.github.fanhefeng.lumitext`. With a real
-   Team ID, register an App Group of that name in the developer portal (or let Xcode
-   create it on first signed build) so the host and saver share a container.
-5. **Sparkle EdDSA keys** (for auto-update; see "Enabling Sparkle" below).
+4. **Sparkle EdDSA keys** (for auto-update; see "Enabling Sparkle" below).
+
+> No App Group registration is needed: the config channel is
+> `/Users/Shared/Lumitext/config.json` via a scoped temporary-exception entitlement
+> (see ADR-0001 addendum — Tahoe's TCC rejects group containers for this setup, and
+> no entitlements file references one). With a real Team ID a Team-ID-prefixed App
+> Group *could* become an option later; treat that as future work, not setup.
 
 ## Cutting a release
 
 ```bash
 # 1. bump version
-#    edit MARKETING_VERSION (and CURRENT_PROJECT_VERSION) in project.yml, then:
+#    edit MARKETING_VERSION (and CURRENT_PROJECT_VERSION) in project.yml, AND the
+#    hardcoded version in distribution/安装说明.txt (first line), then:
 xcodegen generate
 
 # 2. build Release
@@ -50,16 +55,21 @@ gh release create "v<version>" build/Release/Lumitext-<version>.dmg \
   --title "Lumitext <version>" --notes "…"
 
 # 6. update the Homebrew cask: set version + sha256 + (url auto-derives) in
-#    distribution/lumitext.rb, push to your tap (or open a homebrew-cask PR once notable).
+#    distribution/lumitext.rb, run `brew style --cask` + `brew audit --cask`,
+#    push to your tap (or open a homebrew-cask PR once notable).
 
-# 7. update distribution/appcast.xml (see Sparkle below) and publish it where
-#    SUFeedURL points (GitHub Release asset or GitHub Pages).
+# 7. ONLY once Sparkle is actually compiled in (see "Enabling Sparkle" below —
+#    deferred; skip this step until then): update distribution/appcast.xml and
+#    publish it where SUFeedURL points. In the SAME release, add
+#    `auto_updates true` back to the cask.
 ```
 
 ## Verifying the release on a clean machine / second account
 
 ```bash
-spctl -a -vvv -t install Lumitext.app      # → "accepted, source=Notarized Developer ID"
+# --type exec is the policy for app bundles (-t install is for installer .pkgs
+# and ALWAYS rejects an .app, even a correctly notarized one)
+spctl -a -vvv --type exec Lumitext.app     # → "accepted, source=Notarized Developer ID"
 stapler validate Lumitext.app && stapler validate Lumitext-<version>.dmg
 # Then: download the DMG, drag to /Applications, launch → no Gatekeeper prompt.
 # Open System Settings → Screen Saver → LumitextSaver should appear (re-register if not).

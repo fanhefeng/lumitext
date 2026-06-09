@@ -21,13 +21,15 @@ that gap.
 Lumitext ships as a normal app that embeds a modern **ExtensionKit screensaver**
 (`.appex`, the same format Apple's own screensavers use on Sonoma and later — not the
 buggy legacy `.saver` plug-in). You configure everything in the app; the app writes a
-small config into a shared **App Group** container; the screensaver reads it and renders
-your text. The app's live preview and the screensaver use the *same* rendering code, so
-the preview is true WYSIWYG.
+small config to **`/Users/Shared/Lumitext/config.json`**; the sandboxed screensaver
+reads that exact file through a scoped read-only entitlement (the same shipped pattern
+Aerial uses — App Group containers are rejected by Tahoe's TCC for this setup, see
+[ADR-0001](docs/adr/0001-appex-with-app-group-config.md)). The app's live preview and
+the screensaver use the *same* rendering code, so the preview is true WYSIWYG.
 
 ```
-Lumitext.app  ──writes──▶  App Group container (config.json)  ──reads──▶  LumitextSaver.appex
-   (config GUI + preview)                                                   (renders on idle)
+Lumitext.app  ──writes──▶  /Users/Shared/Lumitext/config.json  ──reads──▶  LumitextSaver.appex
+   (config GUI + preview)     (host = sole writer)        (scoped read-only, renders on idle)
         └──────────────── shared SwiftUI renderer (LumitextCore) ──────────────────┘
 ```
 
@@ -37,8 +39,9 @@ A third-party screensaver renders during the **idle period before macOS secures 
 lock screen** — exactly the window every screensaver (including Apple's) runs in. Once
 the Mac is truly locked, macOS's login window owns the display and no third-party code
 can draw there; that's an OS security boundary, not a Lumitext limitation. Lumitext
-helps you align your "start screensaver" and "require password" timings so your text is
-visible for as long as possible before the secure lock takes over.
+explains this in-app and lets you set the idle ("start screensaver") delay; for the
+longest visible time, set your system's "require password" delay (System Settings →
+Lock Screen) to begin a little after the screensaver starts.
 
 ## Requirements
 
@@ -51,7 +54,8 @@ Pre-built signed releases (DMG + Homebrew cask) will be published once the proje
 reaches its first tagged release. For now, build from source (below).
 
 Sharing an unsigned preview build with someone: `./scripts/make-share-zip.sh
-build/Release/Lumitext.app` produces a zip containing the app plus step-by-step
+build/Debug/Lumitext.app` (the build `dev-build-install.sh` produces) creates a zip
+containing the app plus step-by-step
 install/unblock instructions (`distribution/安装说明.txt`). Recipients need macOS 26+;
 hand-offs via USB/scp open with no prompts, downloads need one Gatekeeper approval
 (both paths are covered in the bundled instructions).
@@ -76,7 +80,7 @@ text in the Lumitext app. See [`CLAUDE.md`](CLAUDE.md) for the full dev loop and
 
 | Path | What |
 |---|---|
-| `App/` | SwiftUI host app — config GUI, live preview, activation, updates |
+| `App/` | SwiftUI host app — config GUI, live preview, activation |
 | `Saver/` | The `.appex` screensaver (private ScreenSaver API via bridging header) |
 | `Packages/LumitextCore/` | Shared config model, store, and SwiftUI renderer (+ tests) |
 | `scripts/` | Build / sign / package tooling |

@@ -67,12 +67,16 @@ Primary rendering verification = **the host app's embedded live preview**
 needs no engine, and is byte-identical to what the saver draws. Use it for almost all
 dev iteration.
 
-Occasional real end-to-end check (saver reads host config in its true sandbox):
+Occasional real end-to-end check (saver reads host config in its true sandbox).
+`papersaver` is NOT on PATH — build it from the cloned PaperSaver repo first
+(`swift build -c release` in /tmp/lumitext-refs/PaperSaver; re-clone after a
+reboot, /tmp is ephemeral):
 ```bash
-papersaver set-saver "LumitextSaver"     # set active (PaperSaver CLI)
+PAPERSAVER=/tmp/lumitext-refs/PaperSaver/.build/release/papersaver
+"$PAPERSAVER" set-saver "LumitextSaver"  # set active (PaperSaver CLI)
 # Then trigger via System Settings > Screen Saver preview, OR wait for real idle.
 # To recover the screen, move the real mouse / press a key — do NOT pkill.
-# When done testing, restore the user's saver:  papersaver set-saver "Hello"
+# When done testing, restore the user's saver:  "$PAPERSAVER" set-saver "Hello"
 ```
 
 If the screensaver subsystem is already wedged (isRunning stuck / container readdir
@@ -82,9 +86,10 @@ exact path still works while wedged; only directory enumeration hangs.
 ## Logs (primary verification channel)
 
 ```bash
-log show --last 3m --predicate 'subsystem == "io.github.fanhefeng.lumitext"' --info --debug
+# /usr/bin/log explicitly — zsh has a `log` builtin that silently breaks predicates
+/usr/bin/log show --last 3m --predicate 'subsystem == "io.github.fanhefeng.lumitext"' --info --debug
 # sandbox denials from the saver process:
-log show --last 3m --predicate 'process == "LumitextSaver"' --info
+/usr/bin/log show --last 3m --predicate 'process == "LumitextSaver"' --info
 ```
 
 ## Gotchas (verified, see PLAN.md for sources)
@@ -94,8 +99,12 @@ log show --last 3m --predicate 'process == "LumitextSaver"' --info
   Aerial v4's shipped pattern). App Group containers are REJECTED by Tahoe's TCC
   unless the group ID is Team-ID-prefixed (impossible with ad-hoc signing) — see
   ADR-0001 addendum. `ScreenSaverDefaults` is a ByHost-container trap — never use it.
-- `isPreview` from the OS is unreliable on Tahoe (FB19201567) — use the
-  frame-width heuristic (< 400pt = preview).
+- `isPreview` from the OS is unreliable on Tahoe (FB19201567). The renderer is
+  preview-agnostic (scales by container height), so the saver passes a constant
+  and needs NO preview detection. If preview-specific behavior is ever needed,
+  derive it from the LAID-OUT view width (< 400pt = preview) — never from
+  NSScreen (the preview runs on a full-size screen, so a screen-width test is
+  always false; that bug shipped once).
 - System Settings "Options…" button is broken on Tahoe — `SSEHasConfigureSheet`
   stays `false`; all config lives in the host app.
 - Thumbnail imageset (107x65 / 214x130) is mandatory or the saver won't appear
@@ -107,4 +116,6 @@ log show --last 3m --predicate 'process == "LumitextSaver"' --info
 
 `/tmp/lumitext-refs/{AppexSaverMinimal,ScreenSaverMinimal,PaperSaver,Aerial}` —
 AppexSaverMinimal is the structural template (MIT); Aerial is the production
-appex precedent; PaperSaver provides activation APIs + CLI.
+appex precedent; PaperSaver provides activation APIs + CLI. **/tmp is wiped on
+reboot** — if the directory is missing, re-clone before using any command that
+references it (e.g. the papersaver CLI above, POST-REBOOT-CHECKLIST).

@@ -28,7 +28,10 @@ final class SnapshotGenerator: XCTestCase {
 
         let samples: [(String, LumitextConfig, CGSize)] = [
             ("default-fullhd", .default, CGSize(width: 1920, height: 1080)),
-            ("default-preview", .default, CGSize(width: 480, height: 270)), // WYSIWYG miniature
+            // WYSIWYG miniature at 16:10 — the built-in-display aspect the live
+            // preview defaults to (PreviewPane.mainScreenAspect's fallback),
+            // so snapshot wrap points match what the preview predicts.
+            ("default-preview", .default, CGSize(width: 480, height: 300)),
             ("custom", LumitextConfig(
                 text: "晚安\nGood Night",
                 fontFamily: "",

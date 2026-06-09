@@ -1,7 +1,7 @@
 //
 //  make-thumbnail.swift
 //  Generates the System Settings thumbnail PNGs (107x65 @1x, 214x130 @2x)
-//  for the saver appex. Run from the repo root:
+//  for the saver appex. Works from any cwd:
 //      swift scripts/make-thumbnail.swift
 //
 //  Uses NSBitmapImageRep with explicit pixel dimensions so Retina backing
@@ -10,7 +10,13 @@
 
 import AppKit
 
-let outDir = "Saver/Assets.xcassets/thumbnail.imageset"
+// Anchor output to the repo root via this script's own location, so the script
+// works regardless of the caller's cwd.
+let repoRoot = URL(fileURLWithPath: #filePath)
+    .deletingLastPathComponent()  // scripts/
+    .deletingLastPathComponent()  // repo root
+let outDir = repoRoot.appendingPathComponent("Saver/Assets.xcassets/thumbnail.imageset").path
+try? FileManager.default.createDirectory(atPath: outDir, withIntermediateDirectories: true)
 let variants: [(w: Int, h: Int, name: String)] = [
     (107, 65, "thumbnail.png"),
     (214, 130, "thumbnail@2x.png"),

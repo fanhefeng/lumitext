@@ -22,9 +22,20 @@ APP="${1:?usage: make-share-zip.sh <Lumitext.app> [output.zip]}"
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist" 2>/dev/null || echo 0.0.0)"
 OUT="${2:-$(dirname "$APP")/Lumitext-$VERSION-preview.zip}"
-STAGE="$(mktemp -d)/Lumitext-$VERSION"
+# trap (not tail rm) so staging is cleaned even when a verify step fails under set -e.
+WORK="$(mktemp -d)"
+trap 'rm -rf "$WORK"' EXIT
+STAGE="$WORK/Lumitext-$VERSION"
 
 codesign --verify --deep --strict "$APP"   # refuse to package a broken signature
+
+# Refuse a bundle carrying the hosted test target (a prior `xcodebuild test`
+# embeds it; stripping HERE would break the seal — rebuild cleanly instead).
+if ls "$APP"/Contents/PlugIns/*.xctest >/dev/null 2>&1; then
+    echo "ERROR: $APP contains a test bundle (built via 'xcodebuild test')." >&2
+    echo "       Re-run scripts/dev-build-install.sh to produce a clean build first." >&2
+    exit 1
+fi
 
 mkdir -p "$STAGE"
 cp -R "$APP" "$STAGE/"
@@ -35,10 +46,9 @@ ditto -c -k --keepParent "$STAGE" "$OUT"
 
 # Round-trip check: the signature must survive compression, or recipients hit a
 # no-"Open Anyway" dead end instead of the documented unblock flow.
-UNPACK="$(mktemp -d)"
+UNPACK="$WORK/unpack"
 ditto -x -k "$OUT" "$UNPACK"
 codesign --verify --deep --strict "$UNPACK/Lumitext-$VERSION/Lumitext.app"
-rm -rf "$(dirname "$STAGE")" "$UNPACK"
 
 # Defensive: if the source copy's appex ever got registered with pluginkit (e.g. the
 # app was launched from build/Release), that registration shadows the /Applications

@@ -13,8 +13,34 @@
 
 import AppKit
 
+#if DEBUG
 final class SnapshotAppDelegate: NSObject, NSApplicationDelegate {
-    static var outputPath: String? { ProcessInfo.processInfo.environment["LUMITEXT_SNAPSHOT_OUT"] }
+    /// Debug-only diagnostics — but Debug builds are what gets shared as preview
+    /// zips, so the env var must not be an arbitrary-path file-drop primitive:
+    /// only paths under the user's home or the temp dirs are honored. The path
+    /// is NORMALIZED first (`..` collapsed, symlinks resolved) — a prefix check
+    /// on the raw string would be trivially bypassed by `/tmp/../etc/x`.
+    static var outputPath: String? {
+        guard let raw = ProcessInfo.processInfo.environment["LUMITEXT_SNAPSHOT_OUT"] else { return nil }
+        let expanded = (raw as NSString).expandingTildeInPath
+        // standardizingPath collapses "..", then resolve symlinks on the FULL
+        // path — resolvingSymlinksInPath leaves nonexistent components as-is,
+        // so a not-yet-created file is fine, while a pre-planted symlink AS the
+        // final component can't redirect the write outside the allowlist.
+        let standardized = (expanded as NSString).standardizingPath
+        let resolved = URL(fileURLWithPath: standardized).resolvingSymlinksInPath().path
+        let allowedRoots = [
+            URL(fileURLWithPath: NSHomeDirectory()).resolvingSymlinksInPath().path + "/",
+            URL(fileURLWithPath: NSTemporaryDirectory()).resolvingSymlinksInPath().path + "/",
+            "/private/tmp/",
+        ]
+        guard !resolved.contains("/../"),
+              allowedRoots.contains(where: { resolved.hasPrefix($0) }) else {
+            FileHandle.standardError.write("SNAPSHOT refused path outside home/tmp: \(resolved)\n".data(using: .utf8)!)
+            return nil
+        }
+        return resolved
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard let out = Self.outputPath else { return }
@@ -56,3 +82,8 @@ final class SnapshotAppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 }
+#else
+/// Release builds carry no snapshot hook (no env-triggered capture/exit paths);
+/// the @NSApplicationDelegateAdaptor in LumitextApp still needs a delegate type.
+final class SnapshotAppDelegate: NSObject, NSApplicationDelegate {}
+#endif

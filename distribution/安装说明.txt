@@ -21,15 +21,20 @@ Lumitext 0.1.0 — 自定义文字屏保（预览版安装说明）
   方式二（终端，一条命令）：
     打开「终端」，粘贴回车：
       xattr -dr com.apple.quarantine /Applications/Lumitext.app
-    注意：不要加 sudo。若提示 Permission denied，先在
-    系统设置 → 隐私与安全性 → 完全磁盘访问权限 里勾选「终端」。
+    一般不需要 sudo。若提示 Permission denied / Operation not permitted，
+    通常是这份 App 由电脑上的另一个用户拖入——改用：
+      sudo xattr -dr com.apple.quarantine /Applications/Lumitext.app
+    （需要管理员密码；输入时屏幕不显示，输完直接回车。）
 
   ※ 老办法"右键 → 打开"在新版 macOS 已被 Apple 移除，不用试了。
   ※ 如果是用 U 盘当面拷贝的，一般不会触发拦截，直接打开即可。
 
 【说明】
   · 屏保展示窗口：macOS 在屏幕进入安全锁定后由系统接管，任何第三方屏保
-    （包括本品）只在「空闲 → 锁定之前」这段时间显示。App 内可一键对齐
-    两个时间设置，最大化展示时长。
+    （包括本品）只在「空闲 → 锁定之前」这段时间显示。想让文字显示更久，
+    可在 系统设置 → 锁定屏幕 里把「要求输入密码」设为屏保启动后稍晚生效
+    （App 内的说明面板有同样的指引）。
+  · 屏保文字按整台 Mac 保存：同一台电脑上的多个账户共用一份设置，
+    以先配置的账户为准。
   · 设置完文字后建议在 系统设置 → 屏幕保护程序 里确认 LumitextSaver 已选中。
   · 项目开源：https://github.com/fanhefeng/lumitext

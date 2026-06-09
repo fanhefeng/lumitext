@@ -13,8 +13,9 @@
 import Foundation
 import ScreenSaver
 import os.log
+import LumitextCore
 
-private let logger = Logger(subsystem: "io.github.fanhefeng.lumitext", category: "Extension")
+private let logger = Logger(subsystem: Identifiers.subsystem, category: "Extension")
 
 @objc(LumitextExtension)
 class LumitextExtension: ScreenSaverExtension {
