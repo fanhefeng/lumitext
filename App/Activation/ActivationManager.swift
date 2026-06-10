@@ -328,7 +328,12 @@ final class ActivationManager: ObservableObject {
                       let created = attrs[.creationDate] as? Date else { return .infinity }
                 return Date().timeIntervalSince(created)
             }()
-            if kill(pid, 0) != 0 || age > 24 * 3600 {
+            // "Process gone" must mean ESRCH specifically: kill() also fails
+            // with EPERM when the PID is ALIVE but owned by another user, and
+            // /Applications is admin-shared — another account's in-flight move
+            // must not be raided. (Its leftovers still age out via the 24h arm.)
+            let processGone = kill(pid, 0) != 0 && errno == ESRCH
+            if processGone || age > 24 * 3600 {
                 try? fm.removeItem(atPath: path)
                 logger.notice("removed orphaned move leftover \(entry, privacy: .public)")
             }
