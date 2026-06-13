@@ -11,10 +11,10 @@
 import Foundation
 import AppKit
 import PaperSaverKit
-import os.log
 import LumitextCore
 
-private let logger = Logger(subsystem: Identifiers.subsystem, category: "Activation")
+// Tees to the unified os.log AND ~/Library/Logs/Lumitext[-Dev]/lumitext.log.
+private let logger = AppLog(category: "Activation")
 
 @MainActor
 final class ActivationManager: ObservableObject {
@@ -208,7 +208,7 @@ final class ActivationManager: ObservableObject {
             // them produces mixed-language sentences for zh-Hans users. The
             // detail goes to the log (where the developer needs it); the user
             // sees a fully-localized sentence with the actionable advice.
-            logger.error("setScreensaverEverywhere failed: \(error.localizedDescription, privacy: .public)")
+            logger.error("setScreensaverEverywhere failed: \(error.localizedDescription)")
             report(String(localized: "setSaverFailed", defaultValue: """
             Couldn't set the screen saver. Try again — if it keeps failing, \
             log out and back in.
@@ -231,7 +231,7 @@ final class ActivationManager: ObservableObject {
             idleTimeSeconds = seconds
         } catch {
             // English-only PaperSaverKit detail goes to the log, not the banner.
-            logger.error("setIdleTime failed: \(error.localizedDescription, privacy: .public)")
+            logger.error("setIdleTime failed: \(error.localizedDescription)")
             report(String(localized: "idleTimeFailed",
                           defaultValue: "Couldn't change the idle delay. Try again in a moment."),
                    kind: .idle)
@@ -262,7 +262,7 @@ final class ActivationManager: ObservableObject {
             Self.stageAndSwap(source: source, dest: dest, staging: staging)
         }.value
         if let failure {
-            logger.error("moveToApplications failed: \(failure, privacy: .public)")
+            logger.error("moveToApplications failed: \(failure)")
             report(failure, kind: .move)
             return
         }
@@ -335,7 +335,7 @@ final class ActivationManager: ObservableObject {
             let processGone = kill(pid, 0) != 0 && errno == ESRCH
             if processGone || age > 24 * 3600 {
                 try? fm.removeItem(atPath: path)
-                logger.notice("removed orphaned move leftover \(entry, privacy: .public)")
+                logger.notice("removed orphaned move leftover \(entry)")
             }
         }
     }

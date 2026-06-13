@@ -48,8 +48,20 @@ struct LumitextApp: App {
                 }
         }
         .windowResizability(.contentMinSize)
-        // Single-document config tool: a second window adds nothing and would
-        // run duplicate registration tasks — remove File > New Window.
-        .commands { CommandGroup(replacing: .newItem) {} }
+        .commands {
+            // Single-document config tool: a second window adds nothing and would
+            // run duplicate registration tasks — remove File > New Window.
+            CommandGroup(replacing: .newItem) {}
+            // Under the app menu, right below "About Lumitext": quick access to the
+            // folders Lumitext reads/writes (config channel, logs, cache, support).
+            // Paths differ by build environment — see AppDirectories.
+            CommandGroup(after: .appInfo) {
+                Menu(String(localized: "menuOpenFolder", defaultValue: "Open Folder")) {
+                    ForEach(FolderActions.Target.allCases, id: \.self) { target in
+                        Button(target.label) { FolderActions.open(target) }
+                    }
+                }
+            }
+        }
     }
 }

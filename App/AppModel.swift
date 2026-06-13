@@ -11,9 +11,9 @@
 import SwiftUI
 import Combine
 import LumitextCore
-import os.log
 
-private let logger = Logger(subsystem: Identifiers.subsystem, category: "AppModel")
+// Tees to the unified os.log AND ~/Library/Logs/Lumitext[-Dev]/lumitext.log.
+private let logger = AppLog(category: "AppModel")
 
 @MainActor
 final class AppModel: ObservableObject {
@@ -58,14 +58,14 @@ final class AppModel: ObservableObject {
                 // symlink. Run fully in-memory on defaults — no load, no
                 // autosave — and say so honestly. The English-only diagnostic
                 // detail goes to the log, not the localized banner.
-                logger.error("shared directory untrusted: \(error.localizedDescription, privacy: .public)")
+                logger.error("shared directory untrusted: \(error.localizedDescription)")
                 warning = String(localized: "sharedDirUntrusted", defaultValue: """
                 The shared settings folder is owned by another account on this \
                 Mac (or isn't safe to use). Lumitext is showing default \
                 settings; changes won't be saved or reach the screensaver.
                 """)
             } catch {
-                logger.error("shared directory prep failed: \(error.localizedDescription, privacy: .public)")
+                logger.error("shared directory prep failed: \(error.localizedDescription)")
                 warning = String(localized: "sharedDirFailed", defaultValue: """
                 Couldn't prepare \(ConfigStore.sharedDirectory.path) — changes \
                 won't reach the screensaver (\(error.localizedDescription))
@@ -206,7 +206,7 @@ final class AppModel: ObservableObject {
         if let failure {
             // The banner is transient; the log is the durable witness for the
             // most common failure a user will ever report.
-            logger.error("autosave failed: \(failure, privacy: .public)")
+            logger.error("autosave failed: \(failure)")
             persistenceWarning = String(localized: "saveFailed",
                                         defaultValue: "Couldn't save settings: \(failure)")
         } else {

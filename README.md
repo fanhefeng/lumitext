@@ -43,6 +43,37 @@ explains this in-app and lets you set the idle ("start screensaver") delay; for 
 longest visible time, set your system's "require password" delay (System Settings →
 Lock Screen) to begin a little after the screensaver starts.
 
+## Files & folders
+
+Lumitext keeps its files in standard macOS locations, and **Debug builds use a
+separate set** (suffixed `-Dev`, config under a `dev/` subdirectory) so iterating on
+a development build never reads or overwrites the data a shipped install owns — and
+vice versa. The build environment is fixed at compile time (`#if DEBUG`); the host
+app and the embedded saver are built together, so they always agree.
+
+Open any of these from the app: **menu bar → Lumitext → Open Folder ▸**.
+
+| What | Release (production) | Debug (development) |
+|---|---|---|
+| Config channel (`config.json`) | `/Users/Shared/Lumitext/` | `/Users/Shared/Lumitext/dev/` |
+| Logs | `~/Library/Logs/Lumitext/` | `~/Library/Logs/Lumitext-Dev/` |
+| Cache | `~/Library/Caches/Lumitext/` | `~/Library/Caches/Lumitext-Dev/` |
+| Application Support | `~/Library/Application Support/Lumitext/` | `~/Library/Application Support/Lumitext-Dev/` |
+
+The config channel stays under `/Users/Shared/Lumitext/` in both environments because
+the sandboxed saver's read-only entitlement is scoped to that path — the Debug
+variant is a `dev/` **subdirectory** of it (a sibling would fall outside the
+exception and the dev saver couldn't read its own config).
+
+**Logs.** The host app writes a rotating text log to
+`lumitext.log` in its Logs folder above (one `.1` backup, capped at a few MB). The
+**screensaver** process is sandboxed and cannot write files, so its diagnostics go
+only to the unified system log — view both (host + saver) with:
+
+```bash
+/usr/bin/log show --last 10m --predicate 'subsystem == "io.github.fanhefeng.lumitext"' --info --debug
+```
+
 ## Requirements
 
 - macOS Tahoe (26.0+). Tahoe-only by design — it uses the modern screensaver extension

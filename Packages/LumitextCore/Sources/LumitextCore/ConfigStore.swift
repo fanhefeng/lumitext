@@ -23,10 +23,13 @@ import Foundation
 // and writes are atomic (rename), so cross-process readers never see a torn file.
 public final class ConfigStore: @unchecked Sendable {
 
-    /// Production shared directory. World-readable by design (the saver reads it from
-    /// its sandbox via a scoped temporary exception). Keep in sync with
-    /// Saver/LumitextSaver*.entitlements.
-    public static let sharedDirectory = URL(fileURLWithPath: "/Users/Shared/Lumitext", isDirectory: true)
+    /// The shared config directory for the current build's environment — production
+    /// at `/Users/Shared/Lumitext`, development at `/Users/Shared/Lumitext/dev`, so a
+    /// dev build never overwrites a shipped install's config (and vice versa). Both
+    /// sit under the saver's read-only sandbox exception; see `AppDirectories`.
+    /// World-readable by design (the saver reads it from its sandbox via the scoped
+    /// temporary exception). Keep in sync with Saver/LumitextSaver*.entitlements.
+    public static var sharedDirectory: URL { AppDirectories.sharedConfig() }
 
     /// File name inside the directory.
     public static let fileName = "config.json"
@@ -63,22 +66,67 @@ public final class ConfigStore: @unchecked Sendable {
     /// REFUSE a directory we can't trust: /Users/Shared is world-writable (1777),
     /// so another local account could pre-create /Users/Shared/Lumitext and own
     /// it (classic /tmp-style squat); the sticky bit only protects entries you
-    /// own from deletion, not from being created first. Once the directory is
-    /// ours and not group/other-writable, the sticky parent prevents others from
-    /// renaming or deleting it, so the post-check state is stable.
+    /// own from deletion, not from being created first.
+    ///
+    /// We trust-check EVERY directory we own from the config root down — not just
+    /// the leaf — because only /Users/Shared itself is OS-protected (sticky 1777).
+    /// The production config dir IS /Users/Shared/Lumitext, so a leaf-only check was
+    /// enough there; but the dev config lives in the /Users/Shared/Lumitext/dev
+    /// SUBDIRECTORY, whose parent /Users/Shared/Lumitext is a plain 0755 dir, NOT
+    /// sticky. If we checked only the `dev` leaf, an attacker who squatted the parent
+    /// could own the directory `dev` lives in and swap it out from under us. Verifying
+    /// the whole chain (parent owned-by-us + not group/other-writable) closes that
+    /// gap; once each level is ours and the OS's sticky /Users/Shared protects the
+    /// root from takeover, the post-check state is stable.
     public func ensureDirectoryExists() throws {
         let dir = fileURL.deletingLastPathComponent()
-        if !FileManager.default.fileExists(atPath: dir.path) {
-            try FileManager.default.createDirectory(
-                at: dir,
-                withIntermediateDirectories: true,
-                // Owner-writable only; world-readable + traversable so the
-                // sandboxed saver can read config.json inside.
-                attributes: [.posixPermissions: 0o755]
-            )
+        for level in ConfigStore.trustedChain(forLeaf: dir) {
+            if !FileManager.default.fileExists(atPath: level.path) {
+                try FileManager.default.createDirectory(
+                    at: level,
+                    // Each level is created (and its perms set) explicitly below, so
+                    // no level is ever left at an unverified default. The parent of
+                    // the first level always exists (the OS's /Users/Shared, or the
+                    // test's temp dir), so intermediates are never needed.
+                    withIntermediateDirectories: true,
+                    // Owner-writable only; world-readable + traversable so the
+                    // sandboxed saver can read config.json inside.
+                    attributes: [.posixPermissions: 0o755]
+                )
+            }
+            try ConfigStore.verifyTrustedDirectory(level)
         }
-        try ConfigStore.verifyTrustedDirectory(dir)
     }
+
+    /// The directories WE own and must trust-check, ordered parent → leaf. For a leaf
+    /// at or below the shared config root (/Users/Shared/Lumitext) this is the root
+    /// plus any environment subdirectory below it (e.g. `dev`); the world-writable +
+    /// sticky /Users/Shared ABOVE the root is the OS's and is intentionally excluded
+    /// (we can't and shouldn't make it owner-only). For any other leaf — a test or an
+    /// injected custom directory — it's just that leaf, preserving the original
+    /// verify-the-leaf contract.
+    static func trustedChain(forLeaf leaf: URL) -> [URL] {
+        let root = sharedConfigRoot.standardizedFileURL
+        let leafStd = leaf.standardizedFileURL
+        guard leafStd == root || leafStd.path.hasPrefix(root.path + "/") else {
+            return [leafStd]
+        }
+        var chain: [URL] = []
+        var current = leafStd
+        while true {
+            chain.append(current)
+            if current == root { break }
+            let parent = current.deletingLastPathComponent().standardizedFileURL
+            if parent == current { break }   // walked to "/" without hitting root — bail
+            current = parent
+        }
+        return chain.reversed()
+    }
+
+    /// The environment-independent root of our shared config tree
+    /// (`/Users/Shared/Lumitext`). Both the production dir and the dev subdirectory
+    /// sit at or under it; trust-checking starts here, never above.
+    private static var sharedConfigRoot: URL { AppDirectories.sharedConfig(.production) }
 
     /// A writer must only use a directory that is (a) a real directory, not a
     /// symlink someone planted, (b) owned by the current user, and (c) not

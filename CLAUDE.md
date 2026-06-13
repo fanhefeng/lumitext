@@ -96,7 +96,14 @@ exact path still works while wedged; only directory enumeration hangs.
 
 - Saver appex is sandboxed: config channel is `/Users/Shared/Lumitext/config.json`
   (host writes; saver reads via a scoped read-only temporary-exception entitlement —
-  Aerial v4's shipped pattern). App Group containers are REJECTED by Tahoe's TCC
+  Aerial v4's shipped pattern). **Debug builds use `/Users/Shared/Lumitext/dev/`
+  instead** (a subdir, so the same entitlement prefix still covers it) — dev/prod
+  paths are centralized in `LumitextCore/AppDirectories.swift`, which also defines the
+  per-user trees (`~/Library/{Logs,Caches,Application Support}/Lumitext[-Dev]`). Host
+  file logs go to `…/Logs/Lumitext[-Dev]/lumitext.log` via `AppLog` (tees to os.log +
+  file); the sandboxed saver can't write files, so it stays os.log-only. Paths are
+  documented per-environment in README and openable from the app's
+  Lumitext ▸ Open Folder menu. App Group containers are REJECTED by Tahoe's TCC
   unless the group ID is Team-ID-prefixed (impossible with ad-hoc signing) — see
   ADR-0001 addendum. `ScreenSaverDefaults` is a ByHost-container trap — never use it.
 - `isPreview` from the OS is unreliable on Tahoe (FB19201567). The renderer is
