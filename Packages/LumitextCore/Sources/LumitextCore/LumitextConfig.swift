@@ -113,7 +113,18 @@ public struct LumitextConfig: Codable, Equatable, Sendable {
     /// scales by (actualHeight / 1080) so the same config looks proportionally
     /// identical on any display and in the small WYSIWYG preview. See
     /// LumitextTextView in LumitextRendering.swift.
-    public var fontSize: Double
+    ///
+    /// Clamped on EVERY mutation, like `text`/`backgroundColor` — init/decode keep
+    /// their own explicit clamps (didSet doesn't fire there). Without this, the
+    /// renderer's "never a NaN/out-of-range size" guarantee would rest on every UI
+    /// call site remembering to clamp; that's the call-site coincidence these
+    /// observers exist to eliminate.
+    public var fontSize: Double {
+        didSet {
+            let clamped = LumitextConfig.clampFontSize(fontSize)
+            if clamped != fontSize { fontSize = clamped }
+        }
+    }
 
     public var textColor: RGBAColor
     /// Opaque on EVERY ingress path — init, decode, AND mutation (the host's
@@ -130,7 +141,13 @@ public struct LumitextConfig: Codable, Equatable, Sendable {
     public var verticalAlignment: VerticalAlignment
 
     /// Line spacing in reference points (added between wrapped/explicit lines).
-    public var lineSpacing: Double
+    /// Clamped on every mutation for the same reason as `fontSize` above.
+    public var lineSpacing: Double {
+        didSet {
+            let clamped = LumitextConfig.clampLineSpacing(lineSpacing)
+            if clamped != lineSpacing { lineSpacing = clamped }
+        }
+    }
 
     public init(
         schemaVersion: Int = LumitextConfig.currentSchemaVersion,

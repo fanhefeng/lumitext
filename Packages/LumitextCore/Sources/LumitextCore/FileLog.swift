@@ -76,7 +76,10 @@ public final class FileLog: @unchecked Sendable {
         let fm = FileManager.default
         if !didPrepareDirectory {
             try? fm.createDirectory(at: directory, withIntermediateDirectories: true)
-            didPrepareDirectory = true
+            // Only stop retrying once the directory actually exists — a transient
+            // failure (disk full, perms) must not permanently disable file logging;
+            // the next write should try to create it again.
+            didPrepareDirectory = fm.fileExists(atPath: directory.path)
         }
         if !fm.fileExists(atPath: fileURL.path) {
             fm.createFile(atPath: fileURL.path, contents: nil)

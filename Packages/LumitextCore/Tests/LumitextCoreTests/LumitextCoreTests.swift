@@ -98,6 +98,29 @@ final class LumitextConfigTests: XCTestCase {
         XCTAssertEqual(try decode(json).lineSpacing, LumitextConfig.lineSpacingRange.upperBound)
     }
 
+    /// fontSize/lineSpacing clamp on direct in-memory MUTATION (didSet), not just
+    /// init/decode — so a programmatic assignment that bypasses the UI's clamps
+    /// can't smuggle a NaN/out-of-range value into persistence or the renderer.
+    func testFontSizeMutationClamps() {
+        var c = LumitextConfig.default
+        c.fontSize = 999_999
+        XCTAssertEqual(c.fontSize, LumitextConfig.fontSizeRange.upperBound)
+        c.fontSize = -5
+        XCTAssertEqual(c.fontSize, LumitextConfig.fontSizeRange.lowerBound)
+        c.fontSize = .nan
+        XCTAssertEqual(c.fontSize, LumitextConfig.fallbackFontSize)
+    }
+
+    func testLineSpacingMutationClamps() {
+        var c = LumitextConfig.default
+        c.lineSpacing = 5000
+        XCTAssertEqual(c.lineSpacing, LumitextConfig.lineSpacingRange.upperBound)
+        c.lineSpacing = -10
+        XCTAssertEqual(c.lineSpacing, 0)
+        c.lineSpacing = .infinity
+        XCTAssertEqual(c.lineSpacing, 0)
+    }
+
     // MARK: - Opaque background (model-boundary contract)
 
     /// The saver engine draws black behind the view and the preview draws a

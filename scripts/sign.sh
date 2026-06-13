@@ -27,6 +27,15 @@ SAVER_ENT="$REPO/Saver/LumitextSaver.entitlements"
 # A prior `xcodebuild test` embeds the hosted test bundle into PlugIns — strip
 # it BEFORE signing (it must never ship, and notarization would choke on it).
 rm -rf "$APP"/Contents/PlugIns/*.xctest
+# Same root cause: `xcodebuild test` also injects ~37MB of XCTest/Testing
+# frameworks into Contents/Frameworks. The signing loop below would otherwise
+# sign them straight into the notarized DMG — baking test code into the release.
+# dev-build-install.sh and make-share-zip.sh already strip/refuse these; the
+# release path must too. (rmdir clears the dir only if it's now empty; a real
+# future dependency like Sparkle leaves it populated and rmdir no-ops.)
+rm -rf "$APP"/Contents/Frameworks/{XCTest,XCTestCore,XCTestSupport,XCTAutomationSupport,XCUIAutomation,XCUnit,Testing}.framework \
+       "$APP"/Contents/Frameworks/libXCTest*.dylib
+rmdir "$APP"/Contents/Frameworks 2>/dev/null || true
 
 if [ "$IDENTITY" = "-" ]; then
     echo "WARNING: signing ad-hoc (-). Result is NOT notarizable; for local testing only."

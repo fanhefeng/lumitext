@@ -39,9 +39,12 @@ fi
 # Same root cause, different location: `xcodebuild test` also injects ~37MB of
 # XCTest/Testing frameworks into Contents/Frameworks, which the PlugIns check
 # above misses. Refuse them too — stripping here would break the seal.
-if ls "$APP"/Contents/Frameworks/XCTest.framework \
-      "$APP"/Contents/Frameworks/Testing.framework \
-      "$APP"/Contents/Frameworks/libXCTest*.dylib >/dev/null 2>&1; then
+# `find -print -quit | grep -q .` is true when ANY pattern matches; the earlier
+# `ls A B C` form exited non-zero unless ALL three existed (libXCTest*.dylib
+# usually doesn't), so the guard fired ~never and shipped XCTest to recipients.
+if find "$APP/Contents/Frameworks" \
+        \( -name 'XCTest.framework' -o -name 'Testing.framework' -o -name 'libXCTest*.dylib' \) \
+        -print -quit 2>/dev/null | grep -q .; then
     echo "ERROR: $APP embeds XCTest/Testing frameworks (from a prior 'xcodebuild test')." >&2
     echo "       Run 'rm -rf build/Debug' then scripts/dev-build-install.sh for a clean build." >&2
     exit 1

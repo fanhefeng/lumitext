@@ -76,7 +76,12 @@ OLD="/Applications/.Lumitext-old-$$.app"
 for leftover in /Applications/.Lumitext-staged-*.app /Applications/.Lumitext-old-*.app; do
     [ -e "$leftover" ] || continue
     pid="${leftover##*-}"; pid="${pid%.app}"
-    if ! kill -0 "$pid" 2>/dev/null; then rm -rf "$leftover"; fi
+    # `ps -p` reports existence regardless of owner. `kill -0` would fail with
+    # EPERM for a LIVE process owned by ANOTHER admin user (/Applications is
+    # admin-shared), wrongly raiding that run's in-flight backup and defeating its
+    # restore path — only delete when the process is genuinely gone. Mirrors the
+    # ESRCH-only Swift cleanup in ActivationManager (commit eb5132a).
+    if ! ps -p "$pid" >/dev/null 2>&1; then rm -rf "$leftover"; fi
 done
 trap 'rm -rf "$STAGED" "$OLD"' EXIT
 cp -R "$APP" "$STAGED"
@@ -86,8 +91,16 @@ if [ -d /Applications/Lumitext.app ]; then
 fi
 if ! mv "$STAGED" /Applications/Lumitext.app; then
     if [ -d "$OLD" ]; then
-        mv "$OLD" /Applications/Lumitext.app
-        echo "install failed; previous app restored" >&2
+        if mv "$OLD" /Applications/Lumitext.app; then
+            echo "install failed; previous app restored" >&2
+        else
+            # Restore ALSO failed: $OLD is now the ONLY surviving copy of the
+            # previous install. Drop it from the cleanup trap so we never delete
+            # the user's last working build; leave it for manual recovery.
+            trap 'rm -rf "$STAGED"' EXIT
+            echo "install failed AND restore failed; previous app preserved — restore it with:" >&2
+            echo "  mv '$OLD' /Applications/Lumitext.app" >&2
+        fi
     fi
     exit 1
 fi
