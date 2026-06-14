@@ -81,15 +81,19 @@ jobs:
           NOTES="$(cat <<'MD'
           Ad-hoc-signed build — **not notarized** (Apple Developer ID pending).
 
-          **Install:** unzip, drag **Lumitext.app** to `/Applications`, open it once
-          (it offers to move itself there if needed), then pick **LumitextSaver** in
-          System Settings → Screen Saver and set your text in the app.
-
-          **Gatekeeper blocks the first launch?** Right-click the app → **Open**, or
-          System Settings → Privacy & Security → **Open Anyway**. A downloaded
-          unsigned app needs this one-time approval; copies moved via USB/AirDrop do not.
-
           Requires **macOS 26 (Tahoe)**.
+
+          **Install**
+
+          1. Unzip and drag **Lumitext.app** into `/Applications`.
+          2. Approve it once (it isn't notarized yet). Easiest — open **Terminal** and run
+          `xattr -dr com.apple.quarantine /Applications/Lumitext.app` (prefix with `sudo ` if
+          it's refused). This also clears the embedded screensaver so it registers reliably.
+          Prefer the UI? Double-click once (it'll be blocked), then **System Settings →
+          Privacy & Security → Open Anyway** and enter your password. *(The old
+          right-click → Open trick no longer works on macOS 26.)*
+          3. Open Lumitext, set your text / font / colors, and click **Set as Screen Saver**
+          (or pick **LumitextSaver** in System Settings → Screen Saver).
           MD
           )"
           # create on first run for this tag; fall back to replacing the asset on re-run
