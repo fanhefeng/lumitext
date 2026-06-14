@@ -1,0 +1,100 @@
+# Builds Lumitext on a GitHub-hosted macOS 26 runner and publishes a downloadable
+# zip of the .app to a GitHub Release. Triggered by pushing a v* tag (one command
+# per release: `git tag v0.1.1 && git push origin v0.1.1`), or manually from the
+# Actions tab.
+#
+# Signing: ad-hoc only (no Apple Developer ID yet) — the build is NOT notarized,
+# so a *downloaded* copy needs one Gatekeeper approval (right-click → Open). The
+# Release notes below say so. Once a Developer ID is available, swap the ad-hoc
+# sign step for scripts/sign.sh + scripts/notarize.sh and the prompt goes away.
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to create (e.g. v0.1.1)"
+        required: true
+
+permissions:
+  contents: write # GITHUB_TOKEN needs this to create the Release + upload assets
+
+concurrency:
+  group: release-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: macos-26 # GA since 2026-02-26, default Xcode 26.4.1
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve tag & version
+        id: v
+        run: |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          echo "tag=$TAG"            >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}"    >> "$GITHUB_OUTPUT"   # v0.1.1 -> 0.1.1
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      # Fast logic gate so a broken build never ships. The rendering suites are
+      # skipped here: they depend on a GUI session (ImageRenderer) and aren't a
+      # reliable gate on a headless runner — they have their own coverage locally.
+      - name: Unit tests (Core)
+        run: swift test --package-path Packages/LumitextCore --skip Rendering
+
+      # Release configuration, ad-hoc signed (project.yml pins CODE_SIGN_IDENTITY=-).
+      # The tag drives the user-visible version; the run number is the build number.
+      - name: Build (Release)
+        run: |
+          xcodebuild -project Lumitext.xcodeproj -scheme Lumitext \
+            -configuration Release SYMROOT="$PWD/build" \
+            MARKETING_VERSION="${{ steps.v.outputs.version }}" \
+            CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
+            build
+
+      # Post-sign the embedded appex (entitlements aren't declared in project.yml —
+      # see the note there). "-" selects ad-hoc + the debug entitlements that let an
+      # unsigned-team build load, and verifies the app-sandbox key pkd requires.
+      - name: Ad-hoc sign
+        run: ./scripts/sign.sh "build/Release/Lumitext.app" -
+
+      # ditto preserves the bundle, symlinks, and resource forks that a plain `zip`
+      # would corrupt. A Release asset must be a file, so the .app is zipped as-is —
+      # no DMG / installer.
+      - name: Zip the app
+        run: ditto -c -k --keepParent "build/Release/Lumitext.app" "Lumitext-${{ steps.v.outputs.tag }}.zip"
+
+      - name: Publish Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ steps.v.outputs.tag }}"
+          NOTES="$(cat <<'MD'
+          Ad-hoc-signed build — **not notarized** (Apple Developer ID pending).
+
+          **Install:** unzip, drag **Lumitext.app** to `/Applications`, open it once
+          (it offers to move itself there if needed), then pick **LumitextSaver** in
+          System Settings → Screen Saver and set your text in the app.
+
+          **Gatekeeper blocks the first launch?** Right-click the app → **Open**, or
+          System Settings → Privacy & Security → **Open Anyway**. A downloaded
+          unsigned app needs this one-time approval; copies moved via USB/AirDrop do not.
+
+          Requires **macOS 26 (Tahoe)**.
+          MD
+          )"
+          # create on first run for this tag; fall back to replacing the asset on re-run
+          gh release create "$TAG" "Lumitext-$TAG.zip" \
+            --target "$GITHUB_SHA" \
+            --title "Lumitext $TAG" \
+            --notes "$NOTES" \
+          || gh release upload "$TAG" "Lumitext-$TAG.zip" --clobber
