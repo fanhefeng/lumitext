@@ -219,9 +219,25 @@ struct ConfigPanel: View {
                 get: { config.text },
                 set: { newValue in
                     let result = LumitextConfig.clampTextReportingTruncation(newValue)
-                    config.text = newValue            // didSet clamps to result.text
+                    // Write the ALREADY-clamped value, not raw `newValue`. The old
+                    // code stored the unclamped string and leaned on config.text's
+                    // didSet to clamp it back a second time — so at the budget cap
+                    // (2000 graphemes / 200 lines / 8000 scalars) the model briefly
+                    // disagreed with what `get` returns, and SwiftUI force-rewrote
+                    // the whole string into the NSTextView. That mid-edit full
+                    // rewrite breaks IME composition (drops in-flight zh-Hans
+                    // candidates) and snaps the caret to the end. Writing the clamped
+                    // value here keeps model and binding read-back identical, so the
+                    // binding is stable in both directions and there's nothing to
+                    // force-rewrite.
+                    config.text = result.text
                     showTruncationNotice = result.truncated
-                    lastEditorText = config.text       // remember what WE set
+                    // Record the clamped value we wrote (use result.text, not a
+                    // read-back of config.text) so there's no "when did didSet run"
+                    // timing question — and so the .onChange(of: config.text) below
+                    // compares clamped-against-clamped across frames, staying stable
+                    // when it decides whether to clear the truncation notice.
+                    lastEditorText = result.text
                 }
             ))
                 .font(.body)

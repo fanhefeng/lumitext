@@ -94,4 +94,53 @@ final class ActivationLogicTests: XCTestCase {
         XCTAssertEqual(try String(contentsOf: marker, encoding: .utf8), "previous install",
                        "the RESTORED bundle must be the original, not the broken copy")
     }
+
+    // MARK: - leftover recognition (cleanupMoveLeftovers, pure half)
+
+    func testLeftoverPIDExtraction() {
+        // Staging entries: `.Lumitext-staging-<pid>.app`.
+        XCTAssertEqual(ActivationManager.leftoverPID(forEntry: ".Lumitext-staging-99999.app"), 99999)
+        // Backup entries: `Lumitext.app.old-<pid>`.
+        XCTAssertEqual(ActivationManager.leftoverPID(forEntry: "Lumitext.app.old-99999"), 99999)
+    }
+
+    func testLeftoverPIDRejectsForeignEntries() {
+        // Not one of ours → not a leftover, never swept.
+        XCTAssertNil(ActivationManager.leftoverPID(forEntry: "Safari.app"))
+        XCTAssertNil(ActivationManager.leftoverPID(forEntry: "Lumitext.app"))
+        XCTAssertNil(ActivationManager.leftoverPID(forEntry: ".SomeoneElse-staging-1.app"))
+    }
+
+    func testLeftoverPIDRejectsNonNumericToken() {
+        // A recognized prefix with a malformed trailing token must yield nil,
+        // not crash or misparse.
+        XCTAssertNil(ActivationManager.leftoverPID(forEntry: ".Lumitext-staging-notapid.app"))
+        XCTAssertNil(ActivationManager.leftoverPID(forEntry: "Lumitext.app.old-"))
+    }
+
+    // MARK: - removal decision (cleanupMoveLeftovers, pure half)
+
+    func testShouldRemoveWhenProcessGone() {
+        // Creating process confirmed gone (ESRCH) → sweep regardless of age.
+        XCTAssertTrue(ActivationManager.shouldRemoveLeftover(processAlive: false, ageSeconds: 1))
+    }
+
+    func testShouldKeepWhenProcessAliveAndYoung() {
+        // A live process with a fresh entry is an in-flight move — keep it.
+        XCTAssertFalse(ActivationManager.shouldRemoveLeftover(processAlive: true, ageSeconds: 10))
+    }
+
+    func testShouldRemoveWhenProcessAliveButTooOld() {
+        // PIDs recycle; an old entry whose "live" PID is a coincidence must
+        // still age out via the 24h arm.
+        XCTAssertTrue(ActivationManager.shouldRemoveLeftover(processAlive: true, ageSeconds: 25 * 3600))
+    }
+
+    /// Regression nail for Fix 1: an unreadable age (nil) must NOT make the age
+    /// arm fire. With a live process and unknown age, the entry must be KEPT —
+    /// the old `.infinity` fallback deleted it, hijacking another account's
+    /// in-flight staging.
+    func testShouldKeepWhenAgeUnknownAndProcessAlive() {
+        XCTAssertFalse(ActivationManager.shouldRemoveLeftover(processAlive: true, ageSeconds: nil))
+    }
 }

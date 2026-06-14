@@ -271,10 +271,16 @@ final class ActivationManager: ObservableObject {
         // exit. A plain `open dest` races our own termination: while the old
         // instance is still alive, LaunchServices resolves the same bundle ID
         // to it, activates the dying process instead of launching the copy,
-        // and the user ends up with nothing running. The watchdog also
-        // retries once, then falls back to reopening the ORIGINAL location —
-        // a failed `open` after we've quit must not strand the user with
-        // nothing running.
+        // and the user ends up with nothing running. The watchdog retries the
+        // open once after a short pause (the first launch of a /Applications
+        // copy can be briefly blocked by Gatekeeper/translocation) — but it
+        // ONLY ever opens `dest`, never the source. The move already succeeded,
+        // so the source is a stale copy: reopening it would run the OLD bundle
+        // while the user believes they're now in /Applications, leaving
+        // isInApplicationsFolder false and trapping them in a repeating
+        // "move to /Applications" prompt loop. (The genuinely-failed-move path
+        // returns early above at `if let failure`, so it never reaches here —
+        // there is no case where the source is the right thing to open.)
         let task = Process()
         task.executableURL = URL(fileURLWithPath: "/bin/sh")
         task.arguments = [
@@ -283,12 +289,11 @@ final class ActivationManager: ObservableObject {
             while /bin/kill -0 "$1" 2>/dev/null; do /bin/sleep 0.1; done
             /usr/bin/open "$2" && exit 0
             /bin/sleep 1
-            /usr/bin/open "$2" || /usr/bin/open "$3"
+            /usr/bin/open "$2"
             """#,
             "lumitext-relaunch",
             String(ProcessInfo.processInfo.processIdentifier),
             dest,
-            source,
         ]
         do {
             try task.run()
@@ -308,36 +313,70 @@ final class ActivationManager: ObservableObject {
     /// /Applications forever (multi-MB each). Sweep them at launch — but only
     /// those whose creating process is gone, so a concurrently-running move
     /// (second instance, dev script) is never raided.
+    ///
+    /// This method owns ONLY the side effects (enumerate /Applications, stat,
+    /// kill-probe, remove). The two decisions it makes — "is this entry one of
+    /// our leftovers, and what PID created it?" and "given that PID's liveness
+    /// and the entry's age, should it go?" — are the pure helpers below, so the
+    /// logic (where Fix 1's age-fallback bug lived undetected, untested) can be
+    /// exercised without a real filesystem.
     nonisolated static func cleanupMoveLeftovers() {
         let fm = FileManager.default
         guard let entries = try? fm.contentsOfDirectory(atPath: "/Applications") else { return }
         for entry in entries {
-            let isStaging = entry.hasPrefix(".Lumitext-staging-") && entry.hasSuffix(".app")
-            let isBackup = entry.hasPrefix("Lumitext.app.old-")
-            guard isStaging || isBackup else { continue }
-            // Trailing token is the creating PID; live process → leave it
-            // alone. PIDs recycle, so ALSO require the entry to be old —
-            // a recycled-PID coincidence must not preserve garbage forever,
-            // and a fresh entry must not be raided mid-move.
-            let stem = isStaging ? String(entry.dropLast(4)) : entry
-            guard let pidToken = stem.split(separator: "-").last,
-                  let pid = pid_t(pidToken) else { continue }
+            guard let pid = leftoverPID(forEntry: entry) else { continue }
             let path = "/Applications/\(entry)"
-            let age: TimeInterval = {
+            // Age is unknowable when creationDate can't be read — pass nil so
+            // the decision falls back to "treat as fresh" and never deletes on
+            // the age arm alone (see shouldRemoveLeftover).
+            let ageSeconds: TimeInterval? = {
                 guard let attrs = try? fm.attributesOfItem(atPath: path),
-                      let created = attrs[.creationDate] as? Date else { return .infinity }
+                      let created = attrs[.creationDate] as? Date else { return nil }
                 return Date().timeIntervalSince(created)
             }()
             // "Process gone" must mean ESRCH specifically: kill() also fails
             // with EPERM when the PID is ALIVE but owned by another user, and
             // /Applications is admin-shared — another account's in-flight move
             // must not be raided. (Its leftovers still age out via the 24h arm.)
-            let processGone = kill(pid, 0) != 0 && errno == ESRCH
-            if processGone || age > 24 * 3600 {
+            let processAlive = !(kill(pid, 0) != 0 && errno == ESRCH)
+            if shouldRemoveLeftover(processAlive: processAlive, ageSeconds: ageSeconds) {
                 try? fm.removeItem(atPath: path)
                 logger.notice("removed orphaned move leftover \(entry)")
             }
         }
+    }
+
+    /// Pure: recognize one of our move leftovers by name and extract the PID
+    /// that created it. Staging entries look like
+    /// `.Lumitext-staging-<pid>.app`; backups like `Lumitext.app.old-<pid>`.
+    /// Returns nil for any other entry, and for a recognized prefix whose
+    /// trailing token isn't a number (so a malformed/foreign name can never be
+    /// mistaken for a leftover and swept).
+    nonisolated static func leftoverPID(forEntry entry: String) -> pid_t? {
+        let isStaging = entry.hasPrefix(".Lumitext-staging-") && entry.hasSuffix(".app")
+        let isBackup = entry.hasPrefix("Lumitext.app.old-")
+        guard isStaging || isBackup else { return nil }
+        // Drop the staging ".app" suffix so the PID is the last "-" token;
+        // backups already end in the PID.
+        let stem = isStaging ? String(entry.dropLast(4)) : entry
+        guard let pidToken = stem.split(separator: "-").last,
+              let pid = pid_t(pidToken) else { return nil }
+        return pid
+    }
+
+    /// Pure: given the creating PID's liveness and the entry's age (nil when
+    /// the age couldn't be read), decide whether to sweep the leftover.
+    ///
+    /// Remove iff the process is gone OR the entry is older than 24h. PIDs
+    /// recycle, so the age arm is the safety net: a recycled-PID coincidence
+    /// must not preserve garbage forever. But when age is UNKNOWABLE we must
+    /// bias toward KEEPING — treating an unreadable age as ∞ (the old bug) made
+    /// the age arm fire unconditionally and deleted even live-process leftovers,
+    /// hijacking another account's in-flight staging. So nil age contributes
+    /// nothing; deletion then rests solely on "process confirmed gone (ESRCH)".
+    nonisolated static func shouldRemoveLeftover(processAlive: Bool, ageSeconds: TimeInterval?) -> Bool {
+        let tooOld = (ageSeconds ?? 0) > 24 * 3600
+        return !processAlive || tooOld
     }
 
     /// The blocking file I/O of the move, off the main actor. Returns a
