@@ -46,6 +46,15 @@ codesign --force --sign - \
     "$APP"
 
 echo "== verify entitlements stuck =="
+# The MOST critical sentinel: an appex signed WITHOUT com.apple.security.app-sandbox
+# is SILENTLY filtered out of pkd discovery — `pluginkit -a` exits 0 but registers
+# nothing (verified 2026-06-04; see CLAUDE.md). This matters more than the read
+# exception below: lose the sandbox key and registration fails with NO error, so
+# check it first and hard-fail. Guards against an entitlements file edited in a way
+# that keeps the path string but drops the sandbox key.
+codesign -d --entitlements - "$APPEX" 2>&1 | grep -q "app-sandbox" \
+    && echo "appex: com.apple.security.app-sandbox ✓" \
+    || { echo "appex: com.apple.security.app-sandbox MISSING — pkd will silently filter it"; exit 1; }
 codesign -d --entitlements - "$APPEX" 2>&1 | grep -q "/Users/Shared/Lumitext" \
     && echo "appex: /Users/Shared/Lumitext read exception ✓" \
     || { echo "appex: shared-dir read exception MISSING"; exit 1; }
