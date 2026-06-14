@@ -283,3 +283,130 @@ final class RenderingSmokeTests: XCTestCase {
         return try XCTUnwrap(color.usingColorSpace(.sRGB))
     }
 }
+
+/// Assertion-grade coverage for the 9 alignment combinations. The gated
+/// SnapshotGenerator only emits PNGs for a human to eyeball; a mutant that maps
+/// `.leading → .trailing`, swaps the horizontal/vertical axes, or drops one
+/// `frame(alignment:)` argument sails through the bridge tests above (they only
+/// check enum→enum mapping, never that the renderer actually paints the glyph in
+/// the matching corner). These tests pin the glyph's *centroid* to the expected
+/// region of the rendered bitmap, so any such regression turns the suite red.
+final class RenderingAlignmentTests: XCTestCase {
+
+    /// A bright glyph rendered at moderate size in a known container, returned as
+    /// the normalized centroid of its "lit" (glyph) pixels. Coordinates follow
+    /// the bitmap's own convention: `NSBitmapImageRep` is TOP-origin, so y is
+    /// measured from the TOP of the image — y≈0 is the top edge, y≈1 the bottom.
+    /// (The `testAlignmentCalibratesCoordinateDirection` test below pins this
+    /// convention against a known case so the quadrant asserts can trust it.)
+    /// `nil` means no glyph pixels were found (a render fault, surfaced by the
+    /// caller as a failure — a degenerate empty render must not pass silently).
+    @MainActor
+    private func glyphCentroid(
+        horizontal: LumitextCore.HorizontalAlignment,
+        vertical: LumitextCore.VerticalAlignment
+    ) throws -> (x: Double, y: Double) {
+        var config = LumitextConfig.default
+        // A short, solid, high-contrast token: white block glyphs on the default
+        // deep-navy background. Moderate size so the text block is clearly
+        // SMALLER than the container in BOTH axes — only then does its placement
+        // (corner vs. center) actually move, which is what we're measuring.
+        config.text = "██"
+        config.fontSize = 220
+        config.textColor = .white
+        config.horizontalAlignment = horizontal
+        config.verticalAlignment = vertical
+
+        // A landscape container with comfortable headroom around the text block,
+        // so leading/trailing and top/bottom are unambiguous.
+        let size = CGSize(width: 320, height: 240)
+        let renderer = ImageRenderer(
+            content: LumitextTextView(config: config)
+                .frame(width: size.width, height: size.height)
+        )
+        renderer.proposedSize = ProposedViewSize(size)
+        guard let nsImage = renderer.nsImage else {
+            throw XCTSkip("ImageRenderer produced no image — headless/no-WindowServer session; pixel tests need a GUI login")
+        }
+        let tiff = try XCTUnwrap(nsImage.tiffRepresentation)
+        let rep = try XCTUnwrap(NSBitmapImageRep(data: tiff))
+        let w = rep.pixelsWide, h = rep.pixelsHigh
+        XCTAssertGreaterThan(w, 0)
+        XCTAssertGreaterThan(h, 0)
+
+        var sumX = 0.0, sumY = 0.0, count = 0.0
+        for py in 0..<h {
+            for px in 0..<w {
+                guard let c = rep.colorAt(x: px, y: py)?.usingColorSpace(.sRGB),
+                      c.brightnessComponent > 0.5 else { continue }
+                sumX += Double(px)
+                sumY += Double(py)
+                count += 1
+            }
+        }
+        guard count > 0 else {
+            XCTFail("no glyph pixels found for \(horizontal)/\(vertical) — render produced no visible text")
+            return (0.5, 0.5)
+        }
+        // Normalize to 0...1. Pixel centers sit at index+0.5, but the half-pixel
+        // bias is identical in every case and far below the quadrant thresholds,
+        // so plain index/extent is fine.
+        return (sumX / count / Double(w), sumY / count / Double(h))
+    }
+
+    /// Calibrate the coordinate convention before trusting the quadrant asserts:
+    /// `.top/.leading` must land in the upper-left, i.e. small x AND small y. If
+    /// the bitmap were bottom-origin (or the renderer flipped an axis) this case
+    /// alone would catch it, so every other assert below can rely on
+    /// "small y = visually up".
+    @MainActor
+    func testAlignmentCalibratesCoordinateDirection() throws {
+        let c = try glyphCentroid(horizontal: .leading, vertical: .top)
+        XCTAssertLessThan(c.x, 0.45, "top/leading text must sit on the LEFT (centroid x small)")
+        XCTAssertLessThan(c.y, 0.45, "top/leading text must sit at the TOP (centroid y small, top-origin bitmap)")
+    }
+
+    /// Bottom-right: large x AND large y. A mutant that swaps the two axes, or
+    /// mismaps `.bottom`/`.trailing` to their opposites, pushes the centroid into
+    /// the wrong quadrant and fails here.
+    @MainActor
+    func testBottomTrailingLandsBottomRight() throws {
+        let c = try glyphCentroid(horizontal: .trailing, vertical: .bottom)
+        XCTAssertGreaterThan(c.x, 0.55, "bottom/trailing text must sit on the RIGHT")
+        XCTAssertGreaterThan(c.y, 0.55, "bottom/trailing text must sit at the BOTTOM")
+    }
+
+    /// Center/center: centroid near the middle on both axes. Pins the neutral
+    /// case so a mutant that forces every alignment to a corner (or vice versa)
+    /// can't hide — the corner asserts alone would still pass if everything
+    /// collapsed to one corner, but this one wouldn't.
+    @MainActor
+    func testCenterCenterLandsInTheMiddle() throws {
+        let c = try glyphCentroid(horizontal: .center, vertical: .center)
+        XCTAssertEqual(c.x, 0.5, accuracy: 0.1, "centered text must be horizontally centered")
+        XCTAssertEqual(c.y, 0.5, accuracy: 0.1, "centered text must be vertically centered")
+    }
+
+    /// Top-right: small y, large x. The decisive cross-axis check — it shares its
+    /// horizontal with bottom/trailing and its vertical with top/leading, so a
+    /// mutant that swaps the horizontal and vertical axes (top/trailing →
+    /// rendered as trailing-on-y / top-on-x) lands the centroid in the OPPOSITE
+    /// quadrant and fails, even though the pure corner cases above might survive
+    /// a partial swap.
+    @MainActor
+    func testTopTrailingLandsTopRight() throws {
+        let c = try glyphCentroid(horizontal: .trailing, vertical: .top)
+        XCTAssertGreaterThan(c.x, 0.55, "top/trailing text must sit on the RIGHT")
+        XCTAssertLessThan(c.y, 0.45, "top/trailing text must sit at the TOP")
+    }
+
+    /// Bottom-left: large y, small x. The mirror of top-trailing; together the two
+    /// nail down that the horizontal axis drives x and the vertical axis drives y,
+    /// independently — neither can be silently reading the other's config field.
+    @MainActor
+    func testBottomLeadingLandsBottomLeft() throws {
+        let c = try glyphCentroid(horizontal: .leading, vertical: .bottom)
+        XCTAssertLessThan(c.x, 0.45, "bottom/leading text must sit on the LEFT")
+        XCTAssertGreaterThan(c.y, 0.55, "bottom/leading text must sit at the BOTTOM")
+    }
+}

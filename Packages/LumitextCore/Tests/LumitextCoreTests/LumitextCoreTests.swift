@@ -289,6 +289,27 @@ final class LumitextConfigTests: XCTestCase {
         XCTAssertEqual(LumitextConfig(text: "a\nb\nc").text, "a\nb\nc")
     }
 
+    /// clampTextReportingTruncation is the SINGLE source of the "was it
+    /// shortened?" signal every write site relies on — pin it directly. Oversized
+    /// input must both shorten the text AND report truncated:true; a regression
+    /// that returned the clamped text but a hardcoded truncated:false would let a
+    /// silent truncation reach persistence with no warning.
+    func testClampTextReportingTruncationFlagsOversizedInput() {
+        let huge = String(repeating: "字", count: LumitextConfig.maxTextLength + 500)
+        let result = LumitextConfig.clampTextReportingTruncation(huge)
+        XCTAssertTrue(result.truncated, "oversized input must report truncated")
+        XCTAssertEqual(result.text.count, LumitextConfig.maxTextLength)
+        XCTAssertLessThan(result.text.count, huge.count, "text must actually be shortened")
+    }
+
+    /// …and in-budget input must report truncated:false with the text untouched —
+    /// a regression hardcoding truncated:true would spuriously warn on every save.
+    func testClampTextReportingTruncationDoesNotFlagNormalInput() {
+        let result = LumitextConfig.clampTextReportingTruncation("晚安")
+        XCTAssertFalse(result.truncated, "in-budget input must not report truncation")
+        XCTAssertEqual(result.text, "晚安", "in-budget text must pass through unchanged")
+    }
+
     /// The scalar cut must land on a GRAPHEME boundary: when the budget falls
     /// mid-cluster, the torn cluster is dropped entirely (no invalid text)…
     func testScalarCutMidClusterKeepsOnlyWholeGraphemes() {
@@ -615,6 +636,49 @@ final class ConfigStoreTests: XCTestCase {
                 return XCTFail("expected untrustedDirectory, got \(error)")
             }
         }
+    }
+
+    // MARK: - untrustedReason (the pure (uid, mode) trust judgement)
+    //
+    // verifyTrustedDirectory's ownership/mode core, extracted so the squat
+    // defenses run WITHOUT root. The foreign-owner branch below is the exact
+    // check that previously only testEnsureDirectoryRejectsForeignOwnedDirectory
+    // covered — and that one needs root to chown, so it always skips locally.
+
+    /// A directory we own, ordinary 0755 perms → trusted (nil). The happy path:
+    /// a regression that inverted any guard would turn this non-nil.
+    func testUntrustedReasonTrustsOwnedOwnerOnlyDirectory() {
+        let me = getuid()
+        XCTAssertNil(ConfigStore.untrustedReason(uid: me, mode: S_IFDIR | 0o755, currentUID: me))
+    }
+
+    /// THE core /Users/Shared squat defense, now testable unprivileged: a
+    /// directory owned by ANOTHER uid is refused even with otherwise-fine perms.
+    /// Dropping the `uid == currentUID` guard makes this nil (mutant caught).
+    func testUntrustedReasonRejectsForeignOwner() {
+        let me = getuid()
+        let reason = ConfigStore.untrustedReason(uid: me &+ 1, mode: S_IFDIR | 0o755, currentUID: me)
+        XCTAssertNotNil(reason, "a directory owned by another user must be refused")
+    }
+
+    /// One assertion per WRITE BIT (not a single 0o777 fixture): a 0o777 input
+    /// trips on either bit, so dropping S_IWGRP — or S_IWOTH — from the mask
+    /// would still pass it. Isolating the bits kills both mutants.
+    func testUntrustedReasonRejectsGroupOrOtherWritable() {
+        let me = getuid()
+        XCTAssertNotNil(ConfigStore.untrustedReason(uid: me, mode: S_IFDIR | 0o775, currentUID: me),
+                        "group-writable must be refused")
+        XCTAssertNotNil(ConfigStore.untrustedReason(uid: me, mode: S_IFDIR | 0o757, currentUID: me),
+                        "other-writable must be refused")
+    }
+
+    /// Not a directory (S_IFDIR clear — e.g. the symlink/regular-file case) is
+    /// refused before ownership is even consulted.
+    func testUntrustedReasonRejectsNonDirectory() {
+        let me = getuid()
+        // S_IFLNK (a planted symlink) — owned by us, 0755, but not a directory.
+        XCTAssertNotNil(ConfigStore.untrustedReason(uid: me, mode: S_IFLNK | 0o755, currentUID: me),
+                        "a non-directory must be refused")
     }
 
     /// The foreign-owner branch (st_uid != getuid) is the core /Users/Shared

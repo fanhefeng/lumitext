@@ -128,6 +128,31 @@ public final class ConfigStore: @unchecked Sendable {
     /// sit at or under it; trust-checking starts here, never above.
     private static var sharedConfigRoot: URL { AppDirectories.sharedConfig(.production) }
 
+    /// Pure ownership/mode trust judgement: given a directory's owner uid, its
+    /// raw `st_mode` bits, and the current user's uid, return the reason it is
+    /// UNtrusted (or nil when it passes). Extracted from `verifyTrustedDirectory`
+    /// so the squat-defense core — the foreign-owner branch in particular — is
+    /// testable WITHOUT root: the only way to exercise `st_uid != getuid()` against
+    /// a real filesystem is to chown a directory to another user (needs root), so
+    /// that branch otherwise only ran in a root CI and never locally. As a pure
+    /// (uid, mode) → reason function it can be hit with a synthetic foreign uid.
+    /// Covers exactly the three POSIX-derivable checks; symlink-resolution (lstat)
+    /// and ACL inspection stay in `verifyTrustedDirectory` because they require a
+    /// real fs / the ACL API and can't be reduced to these two scalars.
+    static func untrustedReason(uid: uid_t, mode: mode_t, currentUID: uid_t) -> String? {
+        // Order matches verifyTrustedDirectory so error messages are identical.
+        guard (mode & S_IFMT) == S_IFDIR else {
+            return "not a real directory (symlink?)"
+        }
+        guard uid == currentUID else {
+            return "owned by another user (uid \(uid))"
+        }
+        guard (mode & (S_IWGRP | S_IWOTH)) == 0 else {
+            return "writable by other users"
+        }
+        return nil
+    }
+
     /// A writer must only use a directory that is (a) a real directory, not a
     /// symlink someone planted, (b) owned by the current user, and (c) not
     /// writable by group/others.
@@ -136,14 +161,10 @@ public final class ConfigStore: @unchecked Sendable {
         guard lstat(dir.path, &st) == 0 else {
             throw ConfigStoreError.untrustedDirectory(dir.path, "cannot stat")
         }
-        guard (st.st_mode & S_IFMT) == S_IFDIR else {
-            throw ConfigStoreError.untrustedDirectory(dir.path, "not a real directory (symlink?)")
-        }
-        guard st.st_uid == getuid() else {
-            throw ConfigStoreError.untrustedDirectory(dir.path, "owned by another user (uid \(st.st_uid))")
-        }
-        guard (st.st_mode & (S_IWGRP | S_IWOTH)) == 0 else {
-            throw ConfigStoreError.untrustedDirectory(dir.path, "writable by other users")
+        // The (uid, mode) judgement is the pure function above; only lstat (the
+        // symlink-defeating stat) and the ACL scan below need the live filesystem.
+        if let reason = untrustedReason(uid: st.st_uid, mode: st.st_mode, currentUID: getuid()) {
+            throw ConfigStoreError.untrustedDirectory(dir.path, reason)
         }
         // POSIX mode bits aren't the whole story on macOS: an extended ACL can
         // grant "everyone allow add_file" on a directory whose mode is still
@@ -283,10 +304,23 @@ public final class ConfigStore: @unchecked Sendable {
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let data = try encoder.encode(config)
         let dir = fileURL.deletingLastPathComponent()
-        // Verify trust and write in ONE critical section. If the check ran
-        // outside the queue, the directory could be swapped between check and
-        // write — the exact squat the trust check defends against. Serializing
-        // both also keeps concurrent saves from interleaving.
+        // Verify trust and write in ONE critical section. Note the limit of what
+        // this closes: ioQueue.sync is IN-PROCESS serialization only. It removes
+        // the in-process footgun (two ConfigStore instances / concurrent saves
+        // interleaving a check against a write) and keeps verify immediately
+        // adjacent to the write so the window between them is as small as we can
+        // make it. It does NOT close a cross-process filesystem-level TOCTOU:
+        // verifyTrustedDirectory lstat()s a PATH and data.write(to:) re-resolves
+        // the SAME path — neither is pinned to the inode we verified, so another
+        // local process could swap the directory between them and our serial queue
+        // can't see it. Fully closing that would mean open(O_DIRECTORY|O_NOFOLLOW)
+        // to get an fd, fstat()/verify the fd, then write via openat() relative to
+        // it (operating on the verified inode, not a re-resolved path). We don't,
+        // and under the current ad-hoc-signed threat model that's an acceptable
+        // trade-off: the only path we own that isn't already sticky-protected is
+        // /Users/Shared (mode 1777), and the verifyTrustedDirectory chain plus the
+        // OS's sticky bit on /Users/Shared bound the squat surface to a window too
+        // narrow to be a practical attack here.
         try ConfigStore.ioQueue.sync {
             try ConfigStore.verifyTrustedDirectory(dir)
             try data.write(to: fileURL, options: .atomic)

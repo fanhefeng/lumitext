@@ -68,8 +68,21 @@ public final class FileLog: @unchecked Sendable {
         if handle == nil { openHandle() }
         rotateIfNeeded()
         guard let handle else { return }
-        try? handle.seekToEnd()
-        try? handle.write(contentsOf: data)
+        do {
+            try handle.seekToEnd()
+            try handle.write(contentsOf: data)
+        } catch {
+            // seek/write failed: do NOT keep writing through this handle. A
+            // swallowed seekToEnd() leaves the offset wherever it was, so a
+            // follow-up write would land at the CURRENT position — overwriting
+            // existing log bytes or scribbling mid-file. Drop this line and drop
+            // the handle; the next append() sees handle == nil and openHandle()s
+            // a fresh one positioned correctly. We're on the serial queue, so this
+            // self.handle = nil is race-free, and swallowing keeps the "logging
+            // never crashes / never blocks" contract intact.
+            try? handle.close()
+            self.handle = nil
+        }
     }
 
     private func openHandle() {
