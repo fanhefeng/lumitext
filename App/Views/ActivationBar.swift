@@ -3,7 +3,7 @@
 //  Lumitext
 //
 //  Install/activation controls + the honest "lock screen" explanation and the
-//  idle-time helper, restyled as a section card with a clear status dot.
+//  idle-time helper, with a clear status dot.
 //
 
 import SwiftUI
@@ -123,10 +123,10 @@ struct ActivationBar: View {
                 VStack(alignment: .leading, spacing: Theme.s1) {
                     Label {
                         // Errors are self-contained, localized sentences set at the
-                        // source (ActivationManager) — no hardcoded prefix, which
-                        // used to mislabel e.g. a move failure as a set failure.
-                        // Text(verbatim:) keeps the runtime string out of the
-                        // LocalizedStringKey format machinery (err may contain '%').
+                        // source (ActivationManager) — no hardcoded prefix that could
+                        // mislabel one action's failure as another's. Text(verbatim:)
+                        // keeps the runtime string out of the LocalizedStringKey
+                        // format machinery (err may contain '%').
                         Text(verbatim: err)
                             .font(.caption)
                     } icon: {
@@ -186,7 +186,7 @@ struct ActivationBar: View {
                 Label("Set as Screen Saver", systemImage: "sparkles.tv")
             }
         }
-        .buttonStyle(.borderedProminent)
+        .buttonStyle(.glassProminent)
         .tint(justActivated && activation.isActiveSaver ? Theme.ok : Theme.accent)
         .keyboardShortcut(.defaultAction)
         // Also disabled during the green confirmation window — a second click
@@ -219,6 +219,7 @@ struct ActivationBar: View {
                     Text("Move…")
                 }
             }
+            .buttonStyle(.glass)
             .disabled(activation.moving || activation.busy)
         }
     }

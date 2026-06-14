@@ -171,8 +171,7 @@ public final class ConfigStore: @unchecked Sendable {
         // 0755. The squat threat is specifically a WRITE grant to a principal we
         // don't control, so reject only ACLs that ALLOW a write-class permission
         // — not the mere presence of an ACL. A benign read-only ACL inherited
-        // from a managed/MDM-administered /Users/Shared (the false-positive that
-        // forced legitimate installs into in-memory mode) is left to pass; the
+        // from a managed/MDM-administered /Users/Shared is left to pass; the
         // mode-bit and ownership checks above still bound the rest.
         if let acl = acl_get_file(dir.path, ACL_TYPE_EXTENDED) {
             defer { acl_free(UnsafeMutableRawPointer(acl)) }

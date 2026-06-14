@@ -127,9 +127,9 @@ public struct LumitextConfig: Codable, Equatable, Sendable {
     }
 
     public var textColor: RGBAColor
-    /// Opaque on EVERY ingress path — init, decode, AND mutation (the host's
-    /// ColorPicker and presets bind directly to this property; only call-site
-    /// coincidence kept the invariant before this didSet).
+    /// Opaque on EVERY ingress path — init, decode, AND mutation: the host's
+    /// ColorPicker and presets bind directly to this property, so the didSet
+    /// enforces opacity rather than every call site having to remember to.
     public var backgroundColor: RGBAColor {
         didSet {
             let opaqued = LumitextConfig.opaque(backgroundColor)

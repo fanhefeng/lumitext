@@ -22,7 +22,16 @@ APP="${1:?usage: sign.sh <Lumitext.app> [identity]}"
 IDENTITY="${2:-${LUMITEXT_SIGN_IDENTITY:--}}"
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 APP_ENT="$REPO/App/Lumitext.entitlements"
-SAVER_ENT="$REPO/Saver/LumitextSaver.entitlements"
+# Ad-hoc (-) has no Team ID, so the saver appex needs disable-library-validation
+# or pkd/ScreenSaverEngine refuses to load it — that key lives ONLY in the .debug
+# entitlements (the same reason dev-build-install.sh uses them). A real Developer
+# ID uses the hardened entitlements, which notarization requires WITHOUT that
+# exception. Picking the wrong one ships a release whose screensaver never loads.
+if [ "$IDENTITY" = "-" ]; then
+    SAVER_ENT="$REPO/Saver/LumitextSaver.debug.entitlements"
+else
+    SAVER_ENT="$REPO/Saver/LumitextSaver.entitlements"
+fi
 
 # A prior `xcodebuild test` embeds the hosted test bundle into PlugIns — strip
 # it BEFORE signing (it must never ship, and notarization would choke on it).

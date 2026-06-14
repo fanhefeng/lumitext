@@ -32,9 +32,7 @@ final class ActivationManager: ObservableObject {
     /// Each user action (activate / set idle / move) owns its OWN error slot, so
     /// one action's failure can never silently overwrite or clear another's — the
     /// banner shows the most recently reported one, and clearing it reveals any
-    /// other still-pending failure underneath. (A single shared `lastError` String
-    /// plus a parallel `lastErrorKind` made "wrong kind overwritten/cleared" a
-    /// convention every call site had to remember; this makes it unrepresentable.)
+    /// other still-pending failure underneath.
     private enum ErrorKind { case activation, idle, move }
     private var errorsByKind: [ErrorKind: String] = [:]
     /// Kinds in the order they were last reported (least → most recent), so the
@@ -318,8 +316,7 @@ final class ActivationManager: ObservableObject {
     /// kill-probe, remove). The two decisions it makes — "is this entry one of
     /// our leftovers, and what PID created it?" and "given that PID's liveness
     /// and the entry's age, should it go?" — are the pure helpers below, so the
-    /// logic (where Fix 1's age-fallback bug lived undetected, untested) can be
-    /// exercised without a real filesystem.
+    /// logic can be exercised without a real filesystem.
     nonisolated static func cleanupMoveLeftovers() {
         let fm = FileManager.default
         guard let entries = try? fm.contentsOfDirectory(atPath: "/Applications") else { return }
@@ -369,11 +366,11 @@ final class ActivationManager: ObservableObject {
     ///
     /// Remove iff the process is gone OR the entry is older than 24h. PIDs
     /// recycle, so the age arm is the safety net: a recycled-PID coincidence
-    /// must not preserve garbage forever. But when age is UNKNOWABLE we must
-    /// bias toward KEEPING — treating an unreadable age as ∞ (the old bug) made
-    /// the age arm fire unconditionally and deleted even live-process leftovers,
-    /// hijacking another account's in-flight staging. So nil age contributes
-    /// nothing; deletion then rests solely on "process confirmed gone (ESRCH)".
+    /// must not preserve garbage forever. When age is UNKNOWABLE, bias toward
+    /// KEEPING — treating an unreadable age as ∞ would fire the age arm
+    /// unconditionally and delete even live-process leftovers (hijacking another
+    /// account's in-flight staging). So nil age contributes nothing; deletion
+    /// then rests solely on "process confirmed gone (ESRCH)".
     nonisolated static func shouldRemoveLeftover(processAlive: Bool, ageSeconds: TimeInterval?) -> Bool {
         let tooOld = (ageSeconds ?? 0) > 24 * 3600
         return !processAlive || tooOld

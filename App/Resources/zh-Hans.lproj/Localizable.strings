@@ -11,6 +11,8 @@
 "Colors" = "颜色";
 "Background" = "背景";
 "Position" = "位置";
+"Horizontal" = "水平";
+"Vertical" = "垂直";
 "Left" = "左";
 "Center" = "居中";
 "Right" = "右";

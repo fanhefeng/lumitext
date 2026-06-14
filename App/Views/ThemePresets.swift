@@ -36,8 +36,12 @@ struct StylePreset: Identifiable {
 struct ThemePresets: View {
     @Binding var config: LumitextConfig
 
+    /// Adaptive grid: the swatches reflow and stretch to fill whatever width the
+    /// sidebar currently has, instead of sitting fixed-size at the leading edge.
+    private let columns = [GridItem(.adaptive(minimum: 56), spacing: Theme.s2)]
+
     var body: some View {
-        HStack(spacing: Theme.s2) {
+        LazyVGrid(columns: columns, spacing: Theme.s2) {
             ForEach(StylePreset.all) { preset in
                 chip(preset)
             }
@@ -62,7 +66,7 @@ struct ThemePresets: View {
                 Text("Aa")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(preset.text.swiftUIColor)
-                    .frame(width: 40, height: 28)
+                    .frame(maxWidth: .infinity, minHeight: 30)
                     .background(
                         preset.background.swiftUIColor,
                         in: RoundedRectangle(cornerRadius: Theme.rSmall, style: .continuous)

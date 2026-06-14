@@ -59,7 +59,7 @@ enum FolderActions {
             try? ConfigStore.ensureDirectoryExists()
         case .logs, .cache, .applicationSupport:
             // Per-user ~/Library trees: not world-writable, so a plain create is safe.
-            try? AppDirectories.ensure(target.url)
+            _ = try? AppDirectories.ensure(target.url)
         }
         NSWorkspace.shared.open(target.url)
     }

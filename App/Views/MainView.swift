@@ -2,29 +2,26 @@
 //  MainView.swift
 //  Lumitext
 //
-//  The window layout: editing controls on the left, live preview + activation on
-//  the right, on a unified night background. Dark appearance is forced — a
-//  screensaver configurator is a dark-room tool, and the design language
-//  (night indigo, hairlines at white-8%) is tuned for it.
+//  Apple Music-style layout via the native NavigationSplitView: the editing
+//  controls live in a translucent Liquid Glass SIDEBAR (the system supplies the
+//  floating-panel material and the window's glass chrome), and the live preview +
+//  activation sit in a solid detail pane. This is the Apple-recommended way to get
+//  the sidebar look — no custom window-background glass hacks.
 //
 
 import SwiftUI
-import LumitextCore
 
 struct MainView: View {
     @ObservedObject var model: AppModel
     @ObservedObject var activation: ActivationManager
 
     var body: some View {
-        HStack(spacing: 0) {
+        NavigationSplitView {
             ConfigPanel(config: $model.config, fontFamilies: model.fontFamilies)
-                .frame(width: 380)
-
-            Divider().overlay(Theme.hairline)
-
+                .navigationSplitViewColumnWidth(min: 320, ideal: 360, max: 420)
+        } detail: {
             VStack(alignment: .leading, spacing: Theme.s4) {
                 PreviewPane(config: model.config)
-                Divider().overlay(Theme.hairline)
                 ActivationBar(activation: activation)
                 if let warn = model.persistenceWarning {
                     persistenceBanner(warn)
@@ -33,9 +30,6 @@ struct MainView: View {
             .padding(Theme.s5)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
-        .background(Theme.windowBackground)
-        .tint(Theme.accent)
-        .preferredColorScheme(.dark)
         .navigationTitle("Lumitext")
         .frame(minWidth: 880, minHeight: 720)
     }

@@ -37,10 +37,9 @@ struct PreviewPane: View {
             //
             // The aspect ratio is applied to the RENDER REGION itself, with the
             // bezel as a non-consuming background around it. Insetting a
-            // fixed-aspect frame instead (the old structure) skews the region's
-            // aspect — (W-14)/(H-14) ≠ W/H — and text wrapping happens at the
-            // region's right edge, so even a ~1.5% skew makes the preview
-            // mispredict the saver's wrap points.
+            // fixed-aspect frame instead would skew the region's aspect —
+            // (W-14)/(H-14) ≠ W/H — and text wraps at the region's right edge, so
+            // even a ~1.5% skew makes the preview mispredict the saver's wrap points.
             LumitextTextView(config: config)
                 .clipShape(RoundedRectangle(cornerRadius: Theme.rScreen, style: .continuous))
                 .overlay {
