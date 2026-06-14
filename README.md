@@ -4,6 +4,16 @@ A custom-text screensaver for macOS Tahoe (26). Type any text — pick the font,
 weight, size, color, and position — and it shows as your screensaver, with a live
 preview that matches exactly what you'll see.
 
+**Features**
+
+- Any text in any installed font — pick weight, size, color, line spacing, and on-screen position (a 9-way grid).
+- True WYSIWYG live preview: the editor draws with the *same* renderer as the screensaver.
+- Resolution-independent — one config looks proportionally identical on a laptop, a 6K display, and the System Settings thumbnail.
+- Built-in contrast check — warns before you save text that would be invisible on its background.
+- Light/dark style presets to start from.
+- Standard, per-environment file locations, openable from the menu bar.
+- Localized in English and 简体中文 (zh-Hans).
+
 > **Status:** in active development (pre-release). Built and verified on macOS 26.5.
 
 ![Lumitext configuration window](docs/images/config-window.png)
@@ -91,6 +101,13 @@ install/unblock instructions (`distribution/安装说明.txt`). Recipients need 
 hand-offs via USB/scp open with no prompts, downloads need one Gatekeeper approval
 (both paths are covered in the bundled instructions).
 
+### Installation notes
+
+- **It must run from `/Applications`.** pluginkit caches discovered locations and prefers `/Applications`; running from elsewhere (Downloads, DerivedData) makes macOS load the wrong copy. The app detects this and offers to move itself there.
+- **Quit Lumitext before replacing the bundle** — swapping a live bundle leaves stale code running and confuses LaunchServices. `dev-build-install.sh` handles this for you.
+- **Ad-hoc (unsigned) builds aren't notarized.** A *downloaded* copy needs one Gatekeeper approval (right-click → Open, or System Settings → Privacy & Security → Open Anyway); copies handed over by USB/scp open with no prompt.
+- **System Settings caches screensaver thumbnails aggressively.** If the thumbnail looks stale after re-installing, fully quit and reopen System Settings.
+
 ## Build from source
 
 Requires Xcode 26 and [XcodeGen](https://github.com/yonaskolb/XcodeGen)
@@ -104,8 +121,37 @@ swift test --package-path Packages/LumitextCore      # run core unit tests
 ```
 
 Then open **System Settings → Screen Saver**, pick **LumitextSaver**, and configure the
-text in the Lumitext app. See [`CLAUDE.md`](CLAUDE.md) for the full dev loop and
-[`PLAN.md`](PLAN.md) for the architecture and roadmap.
+text in the Lumitext app. See [`CLAUDE.md`](CLAUDE.md) for the full dev loop,
+[`PLAN.md`](PLAN.md) for the architecture and roadmap, and
+[`docs/project-overview.md`](docs/project-overview.md) for a guided tour of the codebase.
+
+## Using Lumitext
+
+The app must live in **/Applications** (it offers to move itself there, and won't
+activate from anywhere else).
+
+1. **Activate it.** In the Lumitext app, use the **activate** control to set it as your
+   screen saver on every display — or pick **LumitextSaver** by hand in System Settings →
+   Screen Saver.
+2. **Edit your text.** Type in the app and choose font, weight, size, color, line
+   spacing, and position. The preview updates live and matches the real screensaver
+   exactly; changes autosave.
+3. **Set the idle delay.** Choose how long macOS waits before starting the screensaver.
+   For the longest visible time, set System Settings → Lock Screen → "require password"
+   to begin a little *after* the screensaver starts (see [About "lock
+   screen"](#about-lock-screen) above).
+
+**Good to know**
+
+- **Fonts in the screensaver.** The sandboxed saver can only read fonts from
+  `/System/Library/` and `/Library/Fonts/`. A font installed just for your user
+  (`~/Library/Fonts`) shows in the app's preview but **falls back to the system font in
+  the actual screensaver** — the app flags such fonts with a warning.
+- **Contrast.** If your text would be nearly invisible on its background, the app warns
+  you before saving.
+- **"Couldn't read its settings" on screen.** If the screensaver shows that note
+  instead of your text, open the Lumitext app once to repair the config — a read
+  failure deliberately never masquerades as your text being lost.
 
 ## Project layout
 
