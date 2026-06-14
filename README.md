@@ -101,11 +101,37 @@ install/unblock instructions (`distribution/安装说明.txt`). Recipients need 
 hand-offs via USB/scp open with no prompts, downloads need one Gatekeeper approval
 (both paths are covered in the bundled instructions).
 
+### Installing a downloaded zip
+
+A released build ships as a zip of an ad-hoc-signed, **not notarized** app, so a
+downloaded copy needs two extra steps beyond "drag to /Applications" — otherwise
+Gatekeeper blocks it, and the *very first* launch can hang for 1–2 minutes (icon
+bounces, no window) while macOS runs its first-launch security assessment. Unzip,
+then:
+
+```bash
+osascript -e 'tell application "Lumitext" to quit' 2>/dev/null   # quit any running copy first
+rm -rf /Applications/Lumitext.app
+cp -R ~/Downloads/Lumitext.app /Applications/                    # adjust to the unzipped path
+
+xattr -dr com.apple.quarantine /Applications/Lumitext.app        # remove the download quarantine
+spctl -a -vv /Applications/Lumitext.app                          # pre-warm the assessment (prints "rejected" — expected)
+
+open /Applications/Lumitext.app
+```
+
+`xattr -dr` clears the **Gatekeeper block**; `spctl -a` pre-warms (and caches) the
+**first-launch assessment** so the first double-click doesn't hang — they fix two
+*different* problems. Both go away once the project ships a Developer ID-signed,
+notarized release (PLAN.md M0). The bundled `distribution/安装说明.txt` walks
+non-technical recipients through the same steps.
+
 ### Installation notes
 
 - **It must run from `/Applications`.** pluginkit caches discovered locations and prefers `/Applications`; running from elsewhere (Downloads, DerivedData) makes macOS load the wrong copy. The app detects this and offers to move itself there.
 - **Quit Lumitext before replacing the bundle** — swapping a live bundle leaves stale code running and confuses LaunchServices. `dev-build-install.sh` handles this for you.
-- **Ad-hoc (unsigned) builds aren't notarized.** A *downloaded* copy needs one Gatekeeper approval (right-click → Open, or System Settings → Privacy & Security → Open Anyway); copies handed over by USB/scp open with no prompt.
+- **Ad-hoc (unsigned) builds aren't notarized.** A *downloaded* copy needs the unblock + pre-warm steps above; copies handed over by USB/scp open with no prompt.
+- **First launch hangs (icon bounces, no window)?** That's the un-notarized first-launch assessment doing an online notarization check that times out. Pre-warm with `spctl -a` (above), or just wait 1–2 minutes — the result is cached, so subsequent launches are instant. Don't force-quit and re-double-click repeatedly; that just stacks suspended instances.
 - **System Settings caches screensaver thumbnails aggressively.** If the thumbnail looks stale after re-installing, fully quit and reopen System Settings.
 
 ## Build from source
