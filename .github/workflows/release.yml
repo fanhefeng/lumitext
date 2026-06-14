@@ -86,10 +86,10 @@ jobs:
           **Install**
 
           1. Unzip and drag **Lumitext.app** into `/Applications`.
-          2. Approve it once (it isn't notarized yet). Easiest — open **Terminal** and run
+          2. Approve it once (it is not notarized yet). Easiest — open **Terminal** and run
           `xattr -dr com.apple.quarantine /Applications/Lumitext.app` (prefix with `sudo ` if
-          it's refused). This also clears the embedded screensaver so it registers reliably.
-          Prefer the UI? Double-click once (it'll be blocked), then **System Settings →
+          it is refused). This also clears the embedded screensaver so it registers reliably.
+          Prefer the UI? Double-click once (it will be blocked), then **System Settings →
           Privacy & Security → Open Anyway** and enter your password. *(The old
           right-click → Open trick no longer works on macOS 26.)*
           3. Open Lumitext, set your text / font / colors, and click **Set as Screen Saver**
