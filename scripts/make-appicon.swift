@@ -1,7 +1,7 @@
 //
 //  make-appicon.swift
-//  Generates the macOS AppIcon set: a night-indigo rounded-rect with a glowing
-//  "Aa" — the product in one glyph. Works from any cwd:
+//  Generates the macOS AppIcon set: an indigo rounded-rect with a glowing
+//  geometric "A" and a cyan caret — the product in one glyph. Works from any cwd:
 //      swift scripts/make-appicon.swift
 //
 //  Draws the 1024 master with explicit pixel dimensions (Retina-safe), then
@@ -38,36 +38,98 @@ func renderMaster(px: Int) -> NSBitmapImageRep {
     let radius = s * 0.18
     let shape = NSBezierPath(roundedRect: body, xRadius: radius, yRadius: radius)
 
-    // Night-indigo vertical gradient.
+    // Design coordinates live on a 1024-unit grid (y down); map into the body.
+    let b = s - inset * 2
+    func X(_ u: CGFloat) -> CGFloat { inset + u / 1024 * b }
+    func Y(_ v: CGFloat) -> CGFloat { s - (inset + v / 1024 * b) }
+    func L(_ w: CGFloat) -> CGFloat { w / 1024 * b }
+
+    // Indigo vertical gradient.
     NSGradient(colors: [
-        NSColor(srgbRed: 0.16, green: 0.18, blue: 0.38, alpha: 1),
-        NSColor(srgbRed: 0.045, green: 0.055, blue: 0.14, alpha: 1),
+        NSColor(srgbRed: 0.310, green: 0.275, blue: 0.898, alpha: 1),  // #4F46E5
+        NSColor(srgbRed: 0.137, green: 0.106, blue: 0.439, alpha: 1),  // #231B70
     ])!.draw(in: shape, angle: -90)
 
-    // Soft accent glow behind the glyph.
-    let glow = NSGradient(colors: [
-        NSColor(srgbRed: 0.39, green: 0.40, blue: 0.95, alpha: 0.55),
-        NSColor(srgbRed: 0.39, green: 0.40, blue: 0.95, alpha: 0.0),
-    ])!
+    NSGraphicsContext.current?.saveGraphicsState()
     shape.addClip()
-    glow.draw(fromCenter: NSPoint(x: s / 2, y: s * 0.46), radius: 0,
-              toCenter: NSPoint(x: s / 2, y: s * 0.46), radius: s * 0.42,
-              options: [])
 
-    // The glyph.
-    let text = "Aa" as NSString
-    let font = NSFont.systemFont(ofSize: s * 0.34, weight: .bold)
-    let shadow = NSShadow()
-    shadow.shadowColor = NSColor(srgbRed: 0.5, green: 0.55, blue: 1.0, alpha: 0.8)
-    shadow.shadowBlurRadius = s * 0.035
-    let attrs: [NSAttributedString.Key: Any] = [
-        .font: font,
-        .foregroundColor: NSColor.white,
-        .shadow: shadow,
-    ]
-    let size = text.size(withAttributes: attrs)
-    text.draw(at: NSPoint(x: (s - size.width) / 2, y: (s - size.height) / 2), withAttributes: attrs)
+    // Warm halo behind the glyph.
+    let halo = NSGradient(colors: [
+        NSColor(srgbRed: 1.0, green: 0.84, blue: 0.40, alpha: 0.32),   // #FFD666
+        NSColor(srgbRed: 1.0, green: 0.84, blue: 0.40, alpha: 0.0),
+    ])!
+    let haloCenter = NSPoint(x: X(450), y: Y(480))
+    halo.draw(fromCenter: haloCenter, radius: 0, toCenter: haloCenter, radius: L(560), options: [])
 
+    // Geometric letter A: two legs with a soft apex, plus crossbar.
+    // Quad control (466,288) converted to cubic below.
+    let glyph = NSBezierPath()
+    glyph.lineWidth = L(86)
+    glyph.lineCapStyle = .round
+    glyph.lineJoinStyle = .round
+    glyph.move(to: NSPoint(x: X(296), y: Y(736)))
+    glyph.line(to: NSPoint(x: X(452), y: Y(320)))
+    glyph.curve(to: NSPoint(x: X(480), y: Y(320)),
+                controlPoint1: NSPoint(x: X(461.3), y: Y(298.7)),
+                controlPoint2: NSPoint(x: X(470.7), y: Y(298.7)))
+    glyph.line(to: NSPoint(x: X(636), y: Y(736)))
+    glyph.move(to: NSPoint(x: X(360), y: Y(592)))
+    glyph.line(to: NSPoint(x: X(572), y: Y(592)))
+
+    // Pass 1: glow + solid base stroke.
+    NSGraphicsContext.current?.saveGraphicsState()
+    let glow = NSShadow()
+    glow.shadowColor = NSColor(srgbRed: 1.0, green: 0.80, blue: 0.35, alpha: 0.85)
+    glow.shadowBlurRadius = s * 0.038
+    glow.set()
+    NSColor(srgbRed: 0.965, green: 0.718, blue: 0.235, alpha: 1).setStroke()  // #F6B73C
+    glyph.stroke()
+    NSGraphicsContext.current?.restoreGraphicsState()
+
+    // Pass 2: vertical gold gradient inside the stroked glyph.
+    if let cg = NSGraphicsContext.current?.cgContext {
+        cg.saveGState()
+        let stroked = glyph.cgPath.copy(
+            strokingWithWidth: L(86), lineCap: .round, lineJoin: .round, miterLimit: 10)
+        cg.addPath(stroked)
+        cg.clip()
+        let colors = [
+            NSColor(srgbRed: 1.0, green: 0.914, blue: 0.659, alpha: 1).cgColor,   // #FFE9A8
+            NSColor(srgbRed: 0.965, green: 0.718, blue: 0.235, alpha: 1).cgColor, // #F6B73C
+        ] as CFArray
+        if let grad = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
+                                 colors: colors, locations: [0, 1]) {
+            cg.drawLinearGradient(grad,
+                                  start: CGPoint(x: X(466), y: Y(286)),
+                                  end: CGPoint(x: X(466), y: Y(736)),
+                                  options: [.drawsBeforeStartLocation, .drawsAfterEndLocation])
+        }
+        cg.restoreGState()
+    }
+
+    // Cyan caret with its own glow.
+    NSGraphicsContext.current?.saveGraphicsState()
+    let caretGlow = NSShadow()
+    caretGlow.shadowColor = NSColor(srgbRed: 0.42, green: 0.96, blue: 0.93, alpha: 0.85)
+    caretGlow.shadowBlurRadius = s * 0.03
+    caretGlow.set()
+    let caret = NSBezierPath(
+        roundedRect: NSRect(x: X(716), y: Y(740), width: L(36), height: L(424)),
+        xRadius: L(18), yRadius: L(18))
+    NSColor(srgbRed: 0.42, green: 0.96, blue: 0.93, alpha: 1).setFill()  // #6BF5ED
+    caret.fill()
+    NSGraphicsContext.current?.restoreGraphicsState()
+
+    // Baseline.
+    let base = NSBezierPath()
+    base.lineWidth = L(12)
+    base.lineCapStyle = .round
+    base.move(to: NSPoint(x: X(232), y: Y(820)))
+    base.line(to: NSPoint(x: X(792), y: Y(820)))
+    NSColor(srgbRed: 0.545, green: 0.576, blue: 0.910, alpha: 0.55).setStroke()  // #8B93E8
+    base.stroke()
+
+    NSGraphicsContext.current?.restoreGraphicsState()  // shape clip
     return rep
 }
 
