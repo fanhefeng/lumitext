@@ -2,7 +2,8 @@
 //  RenderingTests.swift
 //  LumitextCoreTests
 //
-//  Non-gated coverage for LumitextRendering — the single shared renderer that
+//  Non-gated coverage for the shared rendering layer (LumitextTextView.swift +
+//  FontResolution.swift + ColorBridging.swift) — the single renderer that
 //  backs the WYSIWYG guarantee. The bridging logic here is pure and screenless,
 //  so it runs in normal `swift test` (unlike the LUMITEXT_SNAPSHOT-gated
 //  SnapshotGenerator); a regression mismapping a weight or alignment case must

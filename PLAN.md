@@ -76,10 +76,10 @@ Lumitext.app（宿主，非沙箱，SwiftUI 配置界面 + 实时预览 + 一键
 
 ## 三、里程碑（每个里程碑完成后做 code review + 真机验证）
 
-- **M0 — 所有者前置项（已收口，剩余两项）**
+- **M0 — 所有者前置项（已收口，仅剩发布时一项）**
   - ✅ 产品名 Lumitext / 仓库 fanhefeng/lumitext (public) / bundle ID 前缀 io.github.fanhefeng
-  - ⏳ **接受 Xcode 许可（唯一硬阻塞）**：`sudo xcodebuild -license accept`（实测 `-checkFirstLaunchStatus` exit=69）+ `sudo xcodebuild -runFirstLaunch`；可顺带 `sudo xcode-select -s /Applications/Xcode.app/Contents/Developer`（不切则全程用 DEVELOPER_DIR 环境变量，已验证可行）
-  - ⏳（推荐，可选）Xcode → Settings → Accounts 登录任意免费 Apple ID 启用 Personal Team——若 M1 实测 ad-hoc 签名下 App Group 容器不通，这是唯一备援，提前做掉可保证执行期零打扰
+  - ✅ **接受 Xcode 许可（原唯一硬阻塞，已完成）**：`sudo xcodebuild -license accept`（实测 `-checkFirstLaunchStatus` exit=69）+ `sudo xcodebuild -runFirstLaunch`；可顺带 `sudo xcode-select -s /Applications/Xcode.app/Contents/Developer`（不切则全程用 DEVELOPER_DIR 环境变量，已验证可行）
+  - ✅（已无需）Xcode → Settings → Accounts 登录任意免费 Apple ID 启用 Personal Team——原是「M1 实测 ad-hoc 签名下 App Group 容器不通」的唯一备援；实测确实不通，但最终改走 /Users/Shared 通道（ADR-0001 附录），App Group 整体弃用，该备援失去意义
   - ⏸ 延后（发布时）：Apple Developer Program（$99/年）→ Team ID → Developer ID Application 证书 → notarytool 凭据
   - 验证：`DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -checkFirstLaunchStatus` exit=0
 - **M1 — 私有 API 技术尖兵（1 天，阻塞）**
@@ -143,8 +143,8 @@ Lumitext/
 | 事项 | 状态 |
 |---|---|
 | 产品名 Lumitext / 公开仓库 fanhefeng/lumitext / bundle ID io.github.fanhefeng.* | ✅ 已确认 |
-| Xcode 许可接受 + runFirstLaunch（sudo，唯一硬阻塞） | ⏳ 待用户执行 |
-| Xcode 登录免费 Apple ID（Personal Team，App Group 备援） | ⏳ 推荐可选 |
+| Xcode 许可接受 + runFirstLaunch（sudo，唯一硬阻塞） | ✅ 已完成（M1–M6 已全部完成） |
+| Xcode 登录免费 Apple ID（Personal Team，App Group 备援） | ✅ 已无需（App Group 通道已弃用，见 ADR-0001 附录） |
 | Apple Developer Program / Developer ID 证书 / notarytool 凭据 | ⏸ 发布时再补（用户已决定暂不注册） |
 
 执行模式（用户要求）：开工后免打扰，一切分叉按最佳实践自决并记录 ADR；每个里程碑结束做严格

@@ -12,7 +12,7 @@
 import Foundation
 
 /// Codable RGBA color in the 0...1 range. Stored as plain numbers so the JSON is
-/// portable and human-inspectable; UI conversions live in LumitextRendering.swift.
+/// portable and human-inspectable; UI conversions live in ColorBridging.swift.
 public struct RGBAColor: Codable, Equatable, Sendable {
     // Channels clamp on EVERY mutation (didSet doesn't fire during init, which
     // keeps its own explicit clamps) so direct in-memory assignment can't
@@ -38,7 +38,8 @@ public struct RGBAColor: Codable, Equatable, Sendable {
 
     public static let white = RGBAColor(red: 1, green: 1, blue: 1)
     public static let black = RGBAColor(red: 0, green: 0, blue: 0)
-    /// Default backdrop: deep navy, matching the app's visual identity.
+    /// Default backdrop: deep navy — a quiet, near-black ground that suits an
+    /// idle screen and flatters the default white text.
     public static let defaultBackground = RGBAColor(red: 0.06, green: 0.08, blue: 0.16)
 
     /// Approximate equality at 8-bit display precision (~1/255 per channel).
@@ -112,7 +113,7 @@ public struct LumitextConfig: Codable, Equatable, Sendable {
     /// Point size measured against a 1080-point-tall reference screen. The renderer
     /// scales by (actualHeight / 1080) so the same config looks proportionally
     /// identical on any display and in the small WYSIWYG preview. See
-    /// LumitextTextView in LumitextRendering.swift.
+    /// LumitextTextView.swift.
     ///
     /// Clamped on EVERY mutation, like `text`/`backgroundColor` — init/decode keep
     /// their own explicit clamps (didSet doesn't fire there). Without this, the

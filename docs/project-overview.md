@@ -69,7 +69,9 @@ Lumitext.app                         ← 宿主 app(非沙箱),用户配置界�
 | `LumitextConfig.swift` | **配置模型**。`LumitextConfig`(Codable)、`RGBAColor`、对齐/字重枚举。**所有数值在模型边界 clamp**(init/decode/didSet 三路径),`schemaVersion` 门控、文本三预算(grapheme/scalar/line) |
 | `ConfigStore.swift` | **跨进程配置读写**。原子写、串行队列、**目录信任校验**(防 `/Users/Shared` 抢占 squat)、文件大小上限(防 DoS)、`LoadResult`(loaded/missing/failed 三态) |
 | `AppDirectories.swift` | **环境感知路径**。`AppEnvironment`(`#if DEBUG` → dev)决定所有路径走 `Lumitext` 还是 `Lumitext-Dev`;共享配置 dev 走 `/Users/Shared/Lumitext/dev` 子目录 |
-| `LumitextRendering.swift` | **共享渲染器 `LumitextTextView`**(host 预览与 saver 共用)。颜色/字重/对齐 → SwiftUI/AppKit 桥接;字体按描述符解析 + 缓存;`FontPathPolicy`(判断字体在 saver 沙箱里是否可解析) |
+| `LumitextTextView.swift` | **共享渲染器 `LumitextTextView`**(host 预览与 saver 共用,WYSIWYG 的根)。对齐枚举 → SwiftUI 桥接;按 1080pt 参考屏高缩放实现分辨率无关 |
+| `FontResolution.swift` | 字重桥接;字体按描述符解析 + 缓存;`FontPathPolicy`(判断字体在 saver 沙箱里是否可解析) |
+| `ColorBridging.swift` | `RGBAColor` ↔ SwiftUI `Color` / AppKit `NSColor` 桥接(pattern/catalog 等异常颜色安全回退,绝不崩溃) |
 | `ColorContrast.swift` | WCAG 相对亮度对比度(保存前警告"看不见的文字") |
 | `AppLog.swift` | host 日志门面:每条同时进 os.log 和轮转文件 |
 | `FileLog.swift` | 轮转文件日志(单活动文件 + 一个 `.1` 备份,容量封顶,失败永不崩溃/阻塞) |
@@ -84,7 +86,7 @@ Lumitext.app                         ← 宿主 app(非沙箱),用户配置界�
 | `Activation/ActivationManager.swift` | **激活流程**:pluginkit 注册 → 轮询发现 → PaperSaver 设为活动屏保;搬移到 `/Applications`(stage-then-swap 带回滚);kind-scoped 错误槽 |
 | `FolderActions.swift` | "Open Folder" 菜单:在 Finder 里打开 logs/config/caches/app-support |
 | `SnapshotDumper.swift` | (DEBUG)把渲染器 dump 成 PNG,免引擎验证 saver 输出 |
-| `Views/` | SwiftUI 界面:`MainView`(布局)、`ConfigPanel`(文字/字体/颜色/对齐编辑)、`ActivationBar`(激活+空闲时间)、`PreviewPane`(实时预览,NSHostingView 托管共享渲染器)、`FontPickerField`、`PositionGrid`、`ColorBinding`、`Theme`、`ThemePresets` |
+| `Views/` | SwiftUI 界面:`MainView`(布局)、`ConfigPanel`(文字/字体/颜色/对齐编辑)、`ActivationBar`(激活+空闲时间)、`PreviewPane`(实时预览,NSHostingView 托管共享渲染器)、`MultilineTextField`(NSTextView 多行编辑,CJK 输入法组合安全)、`FontCatalog`(标记 saver 沙箱读不到的字体)、`ColorBinding`、`Theme`、`ThemePresets` |
 
 ### 沙箱屏保 — `Saver/`
 
@@ -210,7 +212,7 @@ xcodebuild -project Lumitext.xcodeproj -scheme LumitextAppTests test SYMROOT=$PW
 1. `PLAN.md` — 架构决策与里程碑(为什么这样设计)
 2. `docs/adr/0001` — 为什么用 `/Users/Shared` 而非 App Group(最关键的决策)
 3. `LumitextCore/LumitextConfig.swift` — 数据模型(一切的中心)
-4. `LumitextCore/LumitextRendering.swift` — 共享渲染器(WYSIWYG 的根)
+4. `LumitextCore/LumitextTextView.swift` — 共享渲染器(WYSIWYG 的根)
 5. `LumitextCore/ConfigStore.swift` — 跨进程通道(安全模型的集中体现)
 6. `Saver/LumitextSaverView.swift` — 沙箱端如何消费配置
 7. `App/AppModel.swift` + `App/Activation/ActivationManager.swift` — 宿主端的写入与激活

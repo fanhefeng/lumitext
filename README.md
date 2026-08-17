@@ -91,8 +91,12 @@ only to the unified system log — view both (host + saver) with:
 
 ## Install
 
-Pre-built signed releases (DMG + Homebrew cask) will be published once the project
-reaches its first tagged release. For now, build from source (below).
+Pre-built releases ship as **ad-hoc-signed zips** on the [GitHub Releases
+page](https://github.com/fanhefeng/lumitext/releases) — download the latest, then
+follow [Installing a downloaded zip](#installing-a-downloaded-zip) below (the
+unblock steps there are required). Signed + notarized DMGs and a Homebrew cask
+will follow once the project has a Developer ID (PLAN.md M0). Building from
+source (below) works too.
 
 Sharing an unsigned preview build with someone: `./scripts/make-share-zip.sh
 build/Debug/Lumitext.app` (the build `dev-build-install.sh` produces) creates a zip
